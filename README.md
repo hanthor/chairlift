@@ -9,7 +9,7 @@
 
 ## Screenshots
 
-![ChairLift Home Page](data/screenshots/home-page.png)
+![ChairLift Applications page](docs/screenshots/1-applications.png)
 
 **[See every screen in the walkthrough →](docs/walkthrough.md)** — each feature
 shown in the real application, captured by `make screenshots`.

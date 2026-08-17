@@ -111,9 +111,10 @@ screenshots: build-e2e
 	CHAIRLIFT_E2E_BUILD_DIR=$(abspath $(BUILD_DIR)) \
 		CHAIRLIFT_WALKTHROUGH_DIR=$(abspath $(SCREENSHOT_DIR)) \
 		$(GOTEST) -count=1 -run TestWalkthroughScreenshots ./test/e2e
-	@rm -rf $(SCREENSHOT_DIR)/home $(SCREENSHOT_DIR)/*.xwd \
-		$(SCREENSHOT_DIR)/chairlift.log $(SCREENSHOT_DIR)/window-geometry.env \
-		$(SCREENSHOT_DIR)/image-info.json
+	@test -n "$(SCREENSHOT_DIR)" || { echo "SCREENSHOT_DIR is empty; refusing to clean" >&2; exit 1; }
+	@rm -rf "$(SCREENSHOT_DIR)/home" $(SCREENSHOT_DIR)/*.xwd \
+		"$(SCREENSHOT_DIR)/chairlift.log" "$(SCREENSHOT_DIR)/window-geometry.env" \
+		"$(SCREENSHOT_DIR)/image-info.json"
 	@echo "==> screenshots written to $(SCREENSHOT_DIR)"
 
 SCREENSHOT_DIR=docs/screenshots

@@ -169,5 +169,7 @@ a code path that reads them, which `make ci` asserts.
 Screenshots are **not** regenerated on every commit: font hinting and GTK
 point releases move pixels, so per-push regeneration would churn the
 repository for no signal. Run `make screenshots` when a feature's appearance
-actually changes. `make ci` separately checks that every page has a screenshot
-and that this document references it, so a feature cannot land undocumented.
+actually changes. `make ci` separately checks that every page has a screenshot, that this
+document references it, that every supported image is named, and that every
+configurable group has an entry here — so a feature cannot land undocumented,
+including one added to a page that already exists.

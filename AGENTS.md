@@ -135,8 +135,13 @@ An agent must not break these:
   application; `docs/walkthrough.md` is the user-facing tour built from them.
   `internal/installcheck`'s walkthrough tests run in `make ci` and fail when a
   page has no screenshot, when the document does not reference one, when a
-  screenshot is orphaned, when a capture byproduct is committed, or when a
-  named feature is undocumented. The check is deliberately referential rather
+  screenshot is orphaned, when a capture byproduct is committed, when a
+  supported image in `imageinfo.KnownImages()` is not named, or when any group
+  in `config.SchemaGroups` has no walkthrough entry. That last check is the
+  forcing function: the group-to-phrase table is hand-written but its
+  completeness is derived from the config schema, so a feature added to an
+  *existing* page — which is how Update All, Automatic Updates, and Roll Back
+  all landed — cannot slip through undocumented. The check is deliberately referential rather
   than a pixel comparison: font hinting and GTK point releases move pixels, so
   regenerating and diffing per push would churn the repository for no signal.
   Adding a page or a user-facing feature means running `make screenshots` and

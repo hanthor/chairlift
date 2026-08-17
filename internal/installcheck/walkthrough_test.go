@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/frostyard/chairlift/internal/config"
+	"github.com/frostyard/chairlift/internal/imageinfo"
 	"github.com/frostyard/chairlift/internal/navigation"
 )
 
@@ -129,35 +131,108 @@ func TestScreenshotDirectoryHoldsOnlyImages(t *testing.T) {
 	}
 }
 
-// Each feature added to ChairLift has to appear in the walkthrough, or the
-// document silently stops being a complete tour. Naming them here is what
-// makes "all features are documented" an executable claim rather than a
-// promise.
-func TestWalkthroughCoversEveryUserFacingFeature(t *testing.T) {
+// Every configurable group must be documented. The list of group-to-phrase
+// mappings below is hand-written, but its *completeness* is enforced: the
+// group names come from config.SchemaGroups, so a group added to any page
+// with no entry here fails this test.
+//
+// That forcing function is the point. Deriving only from navigation.Items()
+// would miss every feature added to an existing page — which is how Update
+// All, Automatic Updates, and Roll Back all landed.
+func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 	doc := readRepoFile(t, walkthroughDoc)
 
-	features := []struct {
-		name    string
-		mention string
-	}{
-		{name: "update all", mention: "Update All"},
-		{name: "automatic updates", mention: "Automatic Updates"},
-		{name: "rollback", mention: "Roll Back"},
-		{name: "release channel", mention: "Release Channel"},
-		{name: "developer mode", mention: "Developer Mode"},
-		{name: "gaming mode", mention: "Gaming Mode"},
-		{name: "homebrew bundles", mention: "Bundles"},
-		{name: "tap trust", mention: "trust the tap"},
-		{name: "updex features", mention: "updex"},
-		{name: "channel table override", mention: "channels.yml"},
+	// Each group's evidence in the walkthrough. A group whose feature is
+	// genuinely not user-visible maps to an empty phrase, which documents
+	// the omission rather than hiding it.
+	documented := map[string]string{
+		// system_page
+		"system_info_group":  "os-release",
+		"bootc_status_group": "deployment status",
+		"health_group":       "Mission Center",
+		// updates_page
+		"update_all_group":        "Update All",
+		"bootc_updates_group":     "System Updates",
+		"sysupdate_updates_group": "System Updates",
+		"flatpak_updates_group":   "Flatpak Updates",
+		"brew_updates_group":      "Homebrew Updates",
+		"brew_trust_group":        "trust the tap",
+		// applications_page
+		"applications_installed_group": "Installed Flatpak applications",
+		"flatpak_user_group":           "Flatpak",
+		"flatpak_system_group":         "Flatpak",
+		"brew_group":                   "Homebrew formulae and casks",
+		"brew_search_group":            "search across both Homebrew namespaces",
+		"brew_bundles_group":           "Bundles",
+		// maintenance_page
+		"maintenance_cleanup_group":      "maintenance actions",
+		"maintenance_brew_group":         "Homebrew and Flatpak cleanup",
+		"maintenance_flatpak_group":      "Homebrew and Flatpak cleanup",
+		"maintenance_optimization_group": "Homebrew and Flatpak cleanup",
+		// features_page
+		"features_group": "updex",
+		"channel_group":  "Release Channel",
+		"dx_group":       "Developer Mode",
+		"gaming_group":   "Gaming Mode",
+		// help_page
+		"help_resources_group": "issue tracker",
 	}
 
-	for _, feature := range features {
-		t.Run(feature.name, func(t *testing.T) {
-			if !strings.Contains(doc, feature.mention) {
-				t.Errorf("%s does not document %s (looked for %q)", walkthroughDoc, feature.name, feature.mention)
-			}
-		})
+	pages, err := config.SchemaPages()
+	if err != nil {
+		t.Fatalf("config.SchemaPages(): %v", err)
+	}
+	if len(pages) == 0 {
+		t.Fatal("config.SchemaPages() is empty")
+	}
+
+	seen := make(map[string]bool, len(documented))
+	for _, page := range pages {
+		groups, err := config.SchemaGroups(page)
+		if err != nil {
+			t.Fatalf("config.SchemaGroups(%q): %v", page, err)
+		}
+		for _, group := range groups {
+			seen[group] = true
+			t.Run(page+"/"+group, func(t *testing.T) {
+				phrase, ok := documented[group]
+				if !ok {
+					t.Fatalf("group %q has no walkthrough entry; document it in %s and add it to this table",
+						group, walkthroughDoc)
+				}
+				if phrase == "" {
+					return // deliberately not user-visible
+				}
+				if !strings.Contains(doc, phrase) {
+					t.Errorf("%s does not document group %q (looked for %q)", walkthroughDoc, group, phrase)
+				}
+			})
+		}
+	}
+
+	// A stale entry means a group was removed and the table was not updated.
+	for group := range documented {
+		if !seen[group] {
+			t.Errorf("this table names group %q, which no page declares any more", group)
+		}
+	}
+}
+
+// The walkthrough states the stable and testing streams of each supported
+// image. That is a factual claim about registry contents, so tie it to the
+// table the application actually resolves against — otherwise the document
+// can drift from the code silently.
+func TestWalkthroughNamesEverySupportedImage(t *testing.T) {
+	doc := readRepoFile(t, walkthroughDoc)
+
+	images := imageinfo.KnownImages()
+	if len(images) == 0 {
+		t.Fatal("imageinfo.KnownImages() is empty")
+	}
+	for _, image := range images {
+		if !strings.Contains(doc, image) {
+			t.Errorf("%s does not name the supported image %s", walkthroughDoc, image)
+		}
 	}
 }
 
