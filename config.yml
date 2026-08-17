@@ -8,6 +8,10 @@ system_page:
     enabled: true
   bootc_status_group:
     enabled: true
+  # Which image this machine runs, and the graphics driver it carries. Hidden
+  # on a host with no /usr/share/ublue-os/image-info.json.
+  channel_group:
+    enabled: true
   health_group:
     enabled: true
     app_id: io.missioncenter.MissionCenter
@@ -70,11 +74,9 @@ maintenance_page:
 features_page:
   features_group:
     enabled: true
-  # Bluefin-family groups (Bluefin, Bluefin LTS, Dakota). Each hides itself
-  # on a host with no /usr/share/ublue-os/image-info.json, so leaving them
-  # enabled is safe on every other system.
-  channel_group:
-    enabled: true
+  # Capabilities you turn on. Each hides itself on a host with no
+  # /usr/share/ublue-os/image-info.json, so leaving them enabled is safe on
+  # every other system.
   dx_group:
     enabled: true
   gaming_group:

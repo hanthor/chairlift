@@ -150,19 +150,20 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 		"system_info_group":  "os-release",
 		"bootc_status_group": "deployment status",
 		"health_group":       "Mission Center",
+		"channel_group":      "Release Channel",
 		// updates_page
 		"update_all_group":        "Update All",
 		"bootc_updates_group":     "System Updates",
 		"sysupdate_updates_group": "System Updates",
-		"flatpak_updates_group":   "Flatpak Updates",
-		"brew_updates_group":      "Homebrew Updates",
-		"brew_trust_group":        "trust the tap",
+		"flatpak_updates_group":   "Flatpak",
+		"brew_updates_group":      "Homebrew",
+		"brew_trust_group":        "tap trust",
 		// applications_page
-		"applications_installed_group": "Installed Flatpak applications",
+		"applications_installed_group": "Installed Flatpaks",
 		"flatpak_user_group":           "Flatpak",
 		"flatpak_system_group":         "Flatpak",
-		"brew_group":                   "Homebrew formulae and casks",
-		"brew_search_group":            "search across both Homebrew namespaces",
+		"brew_group":                   "Homebrew formulae",
+		"brew_search_group":            "search across both",
 		"brew_bundles_group":           "Bundles",
 		// maintenance_page
 		"maintenance_cleanup_group":      "maintenance actions",
@@ -171,11 +172,10 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 		"maintenance_optimization_group": "Homebrew and Flatpak cleanup",
 		// features_page
 		"features_group": "updex",
-		"channel_group":  "Release Channel",
 		"dx_group":       "Developer Mode",
 		"gaming_group":   "Gaming Mode",
 		// help_page
-		"help_resources_group": "issue tracker",
+		"help_resources_group": "issues",
 	}
 
 	pages, err := config.SchemaPages()
@@ -218,20 +218,23 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 	}
 }
 
-// The walkthrough states the stable and testing streams of each supported
-// image. That is a factual claim about registry contents, so tie it to the
-// table the application actually resolves against — otherwise the document
-// can drift from the code silently.
-func TestWalkthroughNamesEverySupportedImage(t *testing.T) {
-	doc := readRepoFile(t, walkthroughDoc)
+// Every supported image must be named in its own verification comment in
+// internal/imageinfo/imageinfo.go — the code-adjacent, canonical record of
+// what was checked against the registry and when. That claim does not belong
+// in docs/walkthrough.md: the walkthrough is what a user reads to judge
+// whether the interface is simple, and a stream-availability table read like
+// a spec, not a tour. Keeping the fact in one place also means it cannot
+// drift between two documents that both claim to state it.
+func TestWalkthroughSupportedImagesAreVerifiedInImageinfo(t *testing.T) {
+	source := readRepoFile(t, filepath.Join("internal", "imageinfo", "imageinfo.go"))
 
 	images := imageinfo.KnownImages()
 	if len(images) == 0 {
 		t.Fatal("imageinfo.KnownImages() is empty")
 	}
 	for _, image := range images {
-		if !strings.Contains(doc, image) {
-			t.Errorf("%s does not name the supported image %s", walkthroughDoc, image)
+		if !strings.Contains(source, image) {
+			t.Errorf("internal/imageinfo/imageinfo.go does not record verification for %s", image)
 		}
 	}
 }

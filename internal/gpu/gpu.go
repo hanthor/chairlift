@@ -148,8 +148,19 @@ var readVendorIDs = sysfsVendorIDs
 // display-side classification: the privileged helper derives the driver image
 // from the system image descriptor and the published-variant table, never
 // from this.
-func SetVendorIDs(ids []string) {
-	readVendorIDs = func() []string { return ids }
+// It returns the previous reader so a caller can restore it, matching
+// autoupdate.SetProbe's shape — an exported setter with no way back would
+// leave a process permanently reporting hardware it does not have. A nil or
+// empty list is rejected rather than being treated as "no GPU", since that is
+// indistinguishable from a detection failure.
+func SetVendorIDs(ids []string) (previous func() []string) {
+	previous = readVendorIDs
+	if len(ids) == 0 {
+		return previous
+	}
+	replacement := append([]string(nil), ids...)
+	readVendorIDs = func() []string { return replacement }
+	return previous
 }
 
 // Detect identifies the graphics hardware in this machine.

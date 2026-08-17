@@ -388,12 +388,20 @@ func assertBluefinGroupsRendered(t *testing.T, outDir string) {
 		"tag=latest",
 		"channel=stable",
 		"switchable=true",
-		"channel_group=true",
 		"dx_group=true",
 		"gaming_group=true",
 	} {
 		if !strings.Contains(line, want) {
 			t.Errorf("Bluefin group marker missing %q\n  %s", want, line)
+		}
+	}
+
+	// The release channel and graphics driver moved to the System page, so
+	// their own marker is what proves they rendered.
+	identity := findLogLine(t, outDir, "views: image identity group built")
+	for _, want := range []string{"variant=dakota", "switchable=true", "driver=standard"} {
+		if !strings.Contains(identity, want) {
+			t.Errorf("image identity marker missing %q\n  %s", want, identity)
 		}
 	}
 }

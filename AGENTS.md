@@ -76,7 +76,8 @@ An agent must not break these:
   `pkexec /usr/bin/chairlift-updex-helper` (`internal/updex.HelperPath`, actions
   `org.frostyard.ChairLift.updex.{enable-feature,disable-feature,update}`), and
   `pkexec /usr/bin/chairlift-ublue-helper` (`internal/ublue.HelperPath`,
-  actions `org.frostyard.ChairLift.ublue.{channel-switch,dx-enable,dx-disable}`)
+  actions `org.frostyard.ChairLift.ublue.*` — see the helper-extension
+  invariant below for the full subcommand list)
   — always that fixed absolute path, matching the
   `org.freedesktop.policykit.exec.path` annotation, with the updex subcommand
   matching `org.freedesktop.policykit.exec.argv1`. The helper must strictly
@@ -122,12 +123,12 @@ An agent must not break these:
   idempotent and exits 0 on an already-current system, so a successful OS
   phase is not by itself evidence anything changed.
 - **New privileged operations extend the ublue helper; they do not add a
-  binary.** `chairlift-ublue-helper` now carries seven subcommands
+  binary.** `chairlift-ublue-helper` now carries eight subcommands
   (`channel-switch`, `dx-enable`, `dx-disable`, `restart`, `rollback`,
-  `auto-updates-enable`, `auto-updates-disable`), each selected by exactly one
-  PolicyKit action. Every one takes a fixed argv: no image reference, no
-  username, no systemd unit, no delay, and no rollback target crosses the
-  boundary, because each would be a value an authenticated caller controls.
+  `auto-updates-enable`, `auto-updates-disable`, `driver-switch`), each
+  selected by exactly one PolicyKit action. Every one takes a fixed argv or a
+  word validated against a closed set: no image reference, no username, no
+  systemd unit, no delay, and no rollback target crosses the boundary, because each would be a value an authenticated caller controls.
   `internal/ubluehelper`'s tests assert this per command, and the e2e boundary
   test asserts the installed binary rejects each shape.
 - **Every navigable page has a committed screenshot and a walkthrough entry.**
@@ -146,15 +147,17 @@ An agent must not break these:
   regenerating and diffing per push would churn the repository for no signal.
   Adding a page or a user-facing feature means running `make screenshots` and
   extending `docs/walkthrough.md` in the same change.
-- **The `chairlift_e2e` stub surface is capped and centralized.** Two
+- **The `chairlift_e2e` stub surface is capped and centralized.** Three
   behaviors are stubbed so the screenshot walkthrough can render features a CI
-  runner cannot have: the image descriptor (`CHAIRLIFT_IMAGE_INFO`) and the
-  unattended-update timer state (`CHAIRLIFT_AUTO_UPDATES`). Every stub must be
+  runner cannot have: the image descriptor (`CHAIRLIFT_IMAGE_INFO`), the
+  unattended-update timer state (`CHAIRLIFT_AUTO_UPDATES`), and the graphics
+  hardware (`CHAIRLIFT_GPU_VENDORS`). Every stub must be
   read in `internal/app/imageinfo_override_e2e.go` and nowhere else, behind
   the `chairlift_e2e` tag that only `make e2e` sets, with a no-op counterpart
   in `imageinfo_override.go`.
   `internal/installcheck.TestDescriptorOverrideStaysBehindTheE2EBuildTag`
-  enforces both halves and must gain each new variable's name. Adding a stub
+  enforces both halves, asserts this rule names every stubbed variable, and
+  must gain each new variable's name. Adding a stub
   means adding it to that one file and that one test — never a second tagged
   file, and never an untagged read. A stub may only affect a read-only,
   display-side classification: anything a privileged helper consults must
@@ -233,6 +236,18 @@ An agent must not break these:
   human-readable version or source ref in a trailing comment and update both
   intentionally. Local actions referenced with `./` are exempt. The
   `internal/installcheck` workflow scan enforces this across every workflow.
+- **Every privileged dispatch point journals, unconditionally.** `internal/ublue.runHelper`
+  and `internal/updex.runHelper` call `journal.Record` on every invocation, dry-run
+  or live, before doing anything else. This is not a `chairlift_e2e` stub: with
+  `$CHAIRLIFT_ACTION_JOURNAL` unset — every ordinary run — it costs one atomic
+  load and does nothing else, so it ships in every released binary. Do not gate
+  a new privileged call behind a helper that bypasses `runHelper`; the journal's
+  value is that it is genuinely one choke point for every privileged action,
+  not most of them.
+- **Desktop notifications stay rare.** `internal/notify` sends exactly one:
+  Update All's completion, because it is the one action long enough a user may
+  have stepped away. A toggle or switch completes in view and already has a
+  toast; do not add a second notification for the same instant event.
 
 ## Documentation
 

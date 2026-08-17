@@ -94,6 +94,7 @@ var items = []Item{
 		Groups: []string{
 			"system_info_group",
 			"bootc_status_group",
+			"channel_group",
 			"health_group",
 		},
 	},
@@ -104,7 +105,6 @@ var items = []Item{
 		ConfigPage: "features_page",
 		Groups: []string{
 			"features_group",
-			"channel_group",
 			"dx_group",
 			"gaming_group",
 		},

@@ -30,7 +30,7 @@ func (uh *UserHome) buildFeaturesPage() {
 	if uh.config.IsGroupEnabled("features_page", "features_group") {
 		// Build the features group (shown if updex is available)
 		uh.featuresGroup = adw.NewPreferencesGroup()
-		uh.featuresGroup.SetTitle("Features")
+		uh.featuresGroup.SetTitle("System Features")
 		uh.featuresGroup.SetDescription("Checking feature availability...")
 
 		// Add Update button as header suffix (disabled until availability confirmed)
@@ -48,7 +48,7 @@ func (uh *UserHome) buildFeaturesPage() {
 
 		// Build the "not available" group (hidden by default)
 		uh.featuresUnavailableGroup = adw.NewPreferencesGroup()
-		uh.featuresUnavailableGroup.SetTitle("Features")
+		uh.featuresUnavailableGroup.SetTitle("System Features")
 		uh.featuresUnavailableGroup.SetDescription("Manage system features")
 		uh.featuresUnavailableGroup.SetVisible(false)
 
@@ -241,22 +241,23 @@ func (uh *UserHome) onUpdateFeaturesClicked(button *gtk.Button) {
 
 // ── Bluefin-family groups ────────────────────────────────────────────────
 //
-// The three groups below are ChairLift's port of bluefinctl's system
-// features to Bluefin, Bluefin LTS, and Dakota. They are independent of the
+// The groups below are ChairLift's port of bluefinctl's developer and gaming
+// capabilities to Bluefin, Bluefin LTS, and Dakota. They are independent of the
 // updex features group above: updex is Snow Linux's feature manager and does
 // not exist on a Bluefin host, so hanging these off updex availability would
 // make them invisible on exactly the systems they are for. Each group
 // instead hides itself when internal/ublue reports no ublue-os image
 // descriptor, which is every non-Bluefin host including Snow Linux.
 
-// buildBluefinGroups builds the release-channel, developer-mode, and
-// gaming-mode groups. It is called from buildFeaturesPage.
+// buildBluefinGroups builds the developer-mode and gaming-mode groups. The
+// release channel and graphics driver live on the System page instead: they
+// describe which image this machine runs, where these two are capabilities
+// you switch on.
 func (uh *UserHome) buildBluefinGroups(page *adw.PreferencesPage) {
-	channelEnabled := uh.config.IsGroupEnabled("features_page", "channel_group")
 	dxEnabled := uh.config.IsGroupEnabled("features_page", "dx_group")
 	gamingEnabled := uh.config.IsGroupEnabled("features_page", "gaming_group")
 
-	if !channelEnabled && !dxEnabled && !gamingEnabled {
+	if !dxEnabled && !gamingEnabled {
 		return
 	}
 
@@ -267,147 +268,21 @@ func (uh *UserHome) buildBluefinGroups(page *adw.PreferencesPage) {
 		return
 	}
 
-	description := pageview.BluefinGroupDescription(status.Variant.DisplayName(), status.Tag)
-
 	// A single structured readiness marker. The screenshot walkthrough
 	// asserts on this line to confirm the captured session really built the
 	// Bluefin-family rows, rather than capturing a page where they were
 	// silently hidden and calling the frame "rendered".
-	log.Printf("views: bluefin groups built variant=%s tag=%s channel=%s switchable=%v developer=%v channel_group=%v dx_group=%v gaming_group=%v",
+	log.Printf("views: bluefin groups built variant=%s tag=%s channel=%s switchable=%v developer=%v dx_group=%v gaming_group=%v",
 		status.Variant, status.Tag, status.Channel,
 		status.CanSwitchTo != imageinfo.ChannelUnknown, status.Developer,
-		channelEnabled, dxEnabled, gamingEnabled)
+		dxEnabled, gamingEnabled)
 
-	if channelEnabled {
-		uh.buildChannelGroup(page, status, description)
-		// The graphics driver is the other axis of "which image am I
-		// running", so it shares the Release Channel group rather than
-		// opening a second one. Both stage a bootc switch; one changes the
-		// tag, the other the image name.
-		uh.buildDriverRow(status)
-	}
 	if dxEnabled {
 		uh.buildDeveloperGroup(page, status)
 	}
 	if gamingEnabled {
 		uh.buildGamingGroup(page)
 	}
-}
-
-// buildChannelGroup builds the release-channel switch. The switch is
-// insensitive when the running image publishes no counterpart tag — every
-// Bluefin Stable host, for one — because there is no reference to hand
-// bootc. See internal/imageinfo's channel table.
-func (uh *UserHome) buildChannelGroup(page *adw.PreferencesPage, status ublue.Status, description string) {
-	group := adw.NewPreferencesGroup()
-	group.SetTitle("Release Channel")
-	group.SetDescription(description)
-
-	onTesting := status.Channel == imageinfo.ChannelTesting
-	switchable := status.CanSwitchTo != imageinfo.ChannelUnknown
-	presentation := pageview.ChannelRow(onTesting, switchable, status.Tag)
-
-	row := adw.NewActionRow()
-	row.SetTitle(presentation.Title)
-	row.SetSubtitle(presentation.Subtitle)
-
-	toggle := gtk.NewSwitch()
-	toggle.SetActive(onTesting)
-	toggle.SetValign(gtk.AlignCenterValue)
-	toggle.SetSensitive(switchable)
-
-	sw := toggle
-	channelRow := row
-	stateSetCb := func(_ gtk.Switch, state bool) bool {
-		uh.onChannelToggled(state, sw, channelRow)
-		return true // block the visual change until the switch is confirmed
-	}
-	toggle.ConnectStateSet(&stateSetCb)
-
-	row.AddSuffix(&toggle.Widget)
-	if switchable {
-		row.SetActivatableWidget(&toggle.Widget)
-	}
-	group.Add(&row.Widget)
-
-	page.Add(group)
-	uh.channelGroup = group
-	uh.channelRow = row
-	uh.channelSwitch = toggle
-}
-
-// buildDriverRow adds the graphics-driver row to the Release Channel group.
-// The row is always informational and only offers an action when the
-// hardware wants a different image than the one running and that image is
-// actually published for the current stream.
-func (uh *UserHome) buildDriverRow(status ublue.Status) {
-	if uh.channelGroup == nil {
-		return
-	}
-
-	recommended := ""
-	if status.RecommendedDriver != "" {
-		recommended = status.RecommendedDriver.DisplayName()
-	}
-	presentation := pageview.GraphicsDriverRow(status.Driver.DisplayName(), status.GPU, recommended)
-
-	row := adw.NewActionRow()
-	row.SetTitle(presentation.Title)
-	row.SetSubtitle(presentation.Subtitle)
-
-	if status.RecommendedDriver != "" {
-		driver := status.RecommendedDriver
-		driverRow := row
-		button := gtk.NewButtonWithLabel("Switch")
-		button.SetValign(gtk.AlignCenterValue)
-		button.AddCssClass("suggested-action")
-		clickedCb := func(gtk.Button) {
-			uh.onDriverSwitchClicked(driver, button, driverRow)
-		}
-		button.ConnectClicked(&clickedCb)
-		row.AddSuffix(&button.Widget)
-		uh.driverButton = button
-	}
-
-	uh.channelGroup.Add(&row.Widget)
-	uh.driverRow = row
-	log.Printf("views: graphics driver row built current=%s recommended=%q gpu=%q",
-		status.Driver, status.RecommendedDriver, status.GPU)
-}
-
-// onDriverSwitchClicked stages a switch to the recommended driver image.
-func (uh *UserHome) onDriverSwitchClicked(driver imageinfo.Driver, button *gtk.Button, row *adw.ActionRow) {
-	if !uh.driverGate.TryStart() {
-		return
-	}
-
-	button.SetSensitive(false)
-	button.SetLabel("Switching…")
-
-	go func() {
-		ctx, cancel := ublue.DefaultContext()
-		defer cancel()
-
-		err := ublue.SwitchDriver(ctx, driver)
-
-		sgtk.RunOnMainThread(func() {
-			uh.driverGate.Complete()
-			button.SetSensitive(true)
-			button.SetLabel("Switch")
-
-			if err != nil {
-				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Graphics driver switch failed: %v", err))
-				return
-			}
-
-			decision := actionmsg.DriverSwitch(ublue.IsDryRun(), driver.DisplayName())
-			if decision.Confirm {
-				row.SetSubtitle(pageview.GraphicsDriverResultSubtitle(driver.DisplayName()))
-				button.SetVisible(false)
-			}
-			uh.toastAdder.ShowToast(decision.Toast)
-		})
-	}()
 }
 
 // buildDeveloperGroup builds the developer-mode switch.
@@ -503,40 +378,6 @@ func (uh *UserHome) refreshGamingState() {
 		uh.gamingSwitch.SetActive(state.Enabled)
 		uh.gamingRow.SetSubtitle(pageview.GamingRow(state.Summary()).Subtitle)
 	})
-}
-
-// onChannelToggled stages a release-channel switch.
-func (uh *UserHome) onChannelToggled(toTesting bool, toggle *gtk.Switch, row *adw.ActionRow) {
-	channel := imageinfo.ChannelStable
-	if toTesting {
-		channel = imageinfo.ChannelTesting
-	}
-
-	toggle.SetSensitive(false)
-
-	go func() {
-		ctx, cancel := ublue.DefaultContext()
-		defer cancel()
-
-		err := ublue.SwitchChannel(ctx, channel)
-
-		sgtk.RunOnMainThread(func() {
-			toggle.SetSensitive(true)
-
-			if err != nil {
-				toggle.SetActive(!toTesting)
-				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Channel switch failed: %v", err))
-				return
-			}
-
-			decision := actionmsg.ChannelSwitch(ublue.IsDryRun(), toTesting)
-			toggle.SetActive(decision.Confirm == toTesting)
-			if decision.Confirm {
-				row.SetSubtitle(pageview.ChannelSwitchResultSubtitle(toTesting))
-			}
-			uh.toastAdder.ShowToast(decision.Toast)
-		})
-	}()
 }
 
 // onDeveloperToggled adds or removes this account's developer groups.

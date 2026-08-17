@@ -171,11 +171,11 @@ func TestPageMetadataCoversEveryBuilderBackedGroup(t *testing.T) {
 		"system": {
 			"system_info_group",
 			"bootc_status_group",
+			"channel_group",
 			"health_group",
 		},
 		"features": {
 			"features_group",
-			"channel_group",
 			"dx_group",
 			"gaming_group",
 		},

@@ -232,6 +232,11 @@ func defaultConfig() *Config {
 		SystemPage: PageConfig{
 			"system_info_group":  GroupConfig{Enabled: true},
 			"bootc_status_group": GroupConfig{Enabled: true},
+			// Which image this machine runs, and the graphics driver that
+			// image carries. Both describe the system's identity, so they
+			// belong beside the rest of it rather than among the features
+			// you switch on.
+			"channel_group": GroupConfig{Enabled: true},
 			"health_group": GroupConfig{
 				Enabled: true,
 				AppID:   "io.missioncenter.MissionCenter",
@@ -279,13 +284,11 @@ func defaultConfig() *Config {
 		},
 		FeaturesPage: PageConfig{
 			"features_group": GroupConfig{Enabled: true},
-			// Bluefin-family groups. They are enabled by default and cost
-			// nothing on other systems: each one hides itself when
+			// Capabilities you turn on. Both hide themselves when
 			// internal/ublue reports no /usr/share/ublue-os/image-info.json,
 			// which is every non-Bluefin host including Snow Linux.
-			"channel_group": GroupConfig{Enabled: true},
-			"dx_group":      GroupConfig{Enabled: true},
-			"gaming_group":  GroupConfig{Enabled: true},
+			"dx_group":     GroupConfig{Enabled: true},
+			"gaming_group": GroupConfig{Enabled: true},
 		},
 		HelpPage: PageConfig{
 			"help_resources_group": GroupConfig{

@@ -152,3 +152,41 @@ func TestSysfsVendorIDsToleratesAMissingTree(t *testing.T) {
 		}
 	}
 }
+
+// The exported stub must be restorable and must refuse an empty list, so a
+// caller cannot leave the process reporting hardware it does not have, and
+// cannot silently turn a detection failure into "no GPU".
+func TestSetVendorIDsIsRestorableAndRejectsEmpty(t *testing.T) {
+	original := readVendorIDs
+	t.Cleanup(func() { readVendorIDs = original })
+
+	previous := SetVendorIDs([]string{"0x10de"})
+	if !Detect().NVIDIA {
+		t.Fatal("SetVendorIDs did not take effect")
+	}
+
+	readVendorIDs = previous
+	if Detect().NVIDIA && original == nil {
+		t.Error("restoring the returned reader did not undo the stub")
+	}
+
+	// An empty or nil list must leave the current reader in place.
+	SetVendorIDs([]string{"0x1002"})
+	before := Detect()
+	SetVendorIDs(nil)
+	if Detect() != before {
+		t.Error("SetVendorIDs(nil) replaced the reader; it must be rejected")
+	}
+	SetVendorIDs([]string{})
+	if Detect() != before {
+		t.Error("SetVendorIDs([]) replaced the reader; it must be rejected")
+	}
+
+	// The stub must not alias the caller's slice.
+	ids := []string{"0x10de"}
+	SetVendorIDs(ids)
+	ids[0] = "0x1002"
+	if !Detect().NVIDIA {
+		t.Error("SetVendorIDs aliased the caller's slice")
+	}
+}

@@ -30,7 +30,7 @@ func applyImageInfoOverride() {
 	// the walkthrough can capture the graphics-driver row for hardware the
 	// capture host does not have.
 	if spec := os.Getenv("CHAIRLIFT_GPU_VENDORS"); spec != "" {
-		gpu.SetVendorIDs(strings.Split(spec, ","))
+		_ = gpu.SetVendorIDs(strings.Split(spec, ","))
 	}
 
 	// $CHAIRLIFT_AUTO_UPDATES is "<is-enabled>,<is-active>" — the two
