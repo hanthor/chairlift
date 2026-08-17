@@ -244,3 +244,135 @@ func ShortDigest(digest string) string {
 	}
 	return digest
 }
+
+// BluefinGroupDescription returns the Bluefin-family group description for a
+// detected variant and running tag — e.g. "Bluefin LTS · lts". An empty tag
+// falls back to the product name alone.
+func BluefinGroupDescription(variantName, tag string) string {
+	if variantName == "" {
+		return "Bluefin-family features"
+	}
+	if tag == "" {
+		return variantName
+	}
+	return fmt.Sprintf("%s · %s", variantName, tag)
+}
+
+// ChannelRow returns the release-channel switch row text. onTesting is the
+// running channel; switchable is false when the running tag has no
+// counterpart to switch to, in which case the subtitle explains the row is
+// inert rather than leaving the user to guess.
+func ChannelRow(onTesting, switchable bool, tag string) Row {
+	row := Row{Title: "Testing Channel"}
+	switch {
+	case !switchable && tag != "":
+		row.Subtitle = fmt.Sprintf("This image publishes no testing channel for the %s tag", tag)
+	case !switchable:
+		row.Subtitle = "This image does not publish a testing channel"
+	case onTesting:
+		row.Subtitle = "Tracking testing — turn off to return to stable, then restart"
+	default:
+		row.Subtitle = "Track pre-release images — unstable, restart to apply"
+	}
+	return row
+}
+
+// ChannelSwitchResultSubtitle returns the subtitle after a channel switch
+// completes. It never claims the running system changed: bootc stages the
+// new image, so the restart is the part the user still has to do.
+func ChannelSwitchResultSubtitle(toTesting bool) string {
+	if toTesting {
+		return "Switched to testing — restart to apply"
+	}
+	return "Switched to stable — restart to apply"
+}
+
+// DeveloperRow returns the developer-mode switch row text. groups are the
+// developer groups the user currently belongs to.
+func DeveloperRow(active bool, groups []string) Row {
+	row := Row{Title: "Developer Mode"}
+	if active {
+		row.Subtitle = fmt.Sprintf("Active — member of %s", strings.Join(groups, ", "))
+		return row
+	}
+	row.Subtitle = "Join the container, VM, and serial-device groups"
+	return row
+}
+
+// DeveloperResultSubtitle returns the subtitle after a developer-mode toggle
+// completes. Group membership is only applied to new sessions, so both
+// outcomes say so rather than implying an immediate effect.
+func DeveloperResultSubtitle(enabled bool) string {
+	if enabled {
+		return "Developer mode enabled — log out and back in to take effect"
+	}
+	return "Developer mode disabled — log out and back in to take effect"
+}
+
+// GamingRow returns the gaming-mode switch row text. summary comes from
+// internal/gaming.State.Summary.
+func GamingRow(summary string) Row {
+	return Row{Title: "Gaming Mode", Subtitle: summary}
+}
+
+// GamingResultSubtitle returns the subtitle after a gaming-mode toggle
+// completes. changed is the number of Flatpaks installed or removed, and
+// failed the number that could not be.
+func GamingResultSubtitle(enabled bool, changed, failed int) string {
+	verb := "removed"
+	if enabled {
+		verb = "installed"
+	}
+	if failed > 0 {
+		return fmt.Sprintf("%d component(s) %s, %d failed", changed, verb, failed)
+	}
+	if changed == 0 {
+		return "No components needed changing"
+	}
+	return fmt.Sprintf("%d component(s) %s", changed, verb)
+}
+
+// UpdateAllRow returns the Update All hero row text before a run has started.
+// planned is the number of phases that will run on this host.
+func UpdateAllRow(planned int) Row {
+	row := Row{Title: "Update All"}
+	switch planned {
+	case 0:
+		row.Subtitle = "Nothing on this system can be updated from here"
+	case 1:
+		row.Subtitle = "Update the one available source"
+	default:
+		row.Subtitle = "Update the system image, applications, and packages in one step"
+	}
+	return row
+}
+
+// UpdateAllPhaseSubtitle returns the per-phase row subtitle. running is true
+// while the phase is in flight; detail is the phase's Result detail once it
+// has finished, and empty before it starts.
+func UpdateAllPhaseSubtitle(running bool, detail string) string {
+	switch {
+	case running:
+		return "Working…"
+	case detail == "":
+		return "Waiting"
+	default:
+		return detail
+	}
+}
+
+// RestartRow returns the restart prompt row text. It is only shown when an OS
+// image is actually staged, so it always names the restart as the thing that
+// applies it rather than as a generic suggestion.
+func RestartRow(version string) Row {
+	if version == "" {
+		return Row{
+			Title:    "Restart to Apply",
+			Subtitle: "A system update is staged and takes effect after a restart",
+		}
+	}
+	return Row{
+		Title:    "Restart to Apply",
+		Subtitle: fmt.Sprintf("Version %s is staged and takes effect after a restart", version),
+	}
+}

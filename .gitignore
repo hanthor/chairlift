@@ -37,6 +37,13 @@ vendor/
 .DS_Store
 Thumbs.db
 /chairlift-updex-helper
+/chairlift-ublue-helper
 
 # mill worktrees
 .worktrees/
+
+# Local Go build cache used when TMPDIR is noexec
+.gotmp/
+
+# Screenshot walkthrough output (CHAIRLIFT_WALKTHROUGH_DIR)
+.walkthrough/

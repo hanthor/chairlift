@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/frostyard/chairlift/internal/ublue"
 	"github.com/frostyard/chairlift/internal/updex"
 )
 
@@ -71,16 +72,29 @@ func TestRunMakeInstallDryRunSkipsWithoutMake(t *testing.T) {
 func assertInstallsPackageLayout(t *testing.T, output, destDir string) {
 	t.Helper()
 
-	wantHelper := filepath.Join("build", filepath.Base(updex.HelperPath)) +
-		" " + filepath.Join(destDir, updex.HelperPath)
-	if !strings.Contains(output, wantHelper) {
-		t.Errorf("make -n install output does not install the updex helper at DESTDIR+HelperPath\nwant substring: %q\noutput:\n%s", wantHelper, output)
+	// Both privileged helpers are checked against their own package's
+	// fixed path constant, so a rename on either side fails here rather
+	// than silently installing a binary pkexec's exec.path annotation no
+	// longer resolves to.
+	for _, helper := range []struct {
+		name string
+		path string
+	}{
+		{"updex", updex.HelperPath},
+		{"ublue", ublue.HelperPath},
+	} {
+		want := filepath.Join("build", filepath.Base(helper.path)) +
+			" " + filepath.Join(destDir, helper.path)
+		if !strings.Contains(output, want) {
+			t.Errorf("make -n install output does not install the %s helper at DESTDIR+HelperPath\nwant substring: %q\noutput:\n%s", helper.name, want, output)
+		}
 	}
 
 	for _, rel := range []string{
 		filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.updex.policy"),
 		filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.bootc.policy"),
 		filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.sysupdate.policy"),
+		filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.ublue.policy"),
 	} {
 		want := filepath.Join(destDir, rel)
 		if !strings.Contains(output, want) {

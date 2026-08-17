@@ -1,8 +1,9 @@
-.PHONY: all build run clean deps tidy install uninstall e2e
+.PHONY: all build build-e2e run clean deps tidy install uninstall e2e
 
 # Binary names
 BINARY_NAME=chairlift
 HELPER_NAME=chairlift-updex-helper
+UBLUE_HELPER_NAME=chairlift-ublue-helper
 
 # Build directory
 BUILD_DIR=build
@@ -50,7 +51,7 @@ deps:
 tidy:
 	$(GOMOD) tidy
 
-build: build-app build-helper
+build: build-app build-helper build-ublue-helper
 
 build-app:
 	@mkdir -p $(BUILD_DIR)
@@ -59,6 +60,10 @@ build-app:
 build-helper:
 	@mkdir -p $(BUILD_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) $(GOBUILD) -o $(BUILD_DIR)/$(HELPER_NAME) ./cmd/chairlift-updex-helper
+
+build-ublue-helper:
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=$(CGO_ENABLED) $(GOBUILD) -o $(BUILD_DIR)/$(UBLUE_HELPER_NAME) ./cmd/chairlift-ublue-helper
 
 run: build
 	./$(BUILD_DIR)/$(BINARY_NAME) --dry-run
@@ -70,10 +75,33 @@ clean:
 test:
 	$(GOTEST) -v ./...
 
-# End-to-end smoke tests require GTK4, Libadwaita, dbus-run-session, and Xvfb.
-# They run separately from ci because the ordinary unit-test gate is
+# The screenshot walkthrough needs ChairLift to render the Bluefin-family
+# rows on a host that is not a Bluefin system, which requires redirecting the
+# image-descriptor read. That override is compiled in only under this build
+# tag, so no released binary can honor it (internal/app/imageinfo_override.go
+# explains why). `make ci` builds untagged, which is what proves it.
+E2E_TAGS=chairlift_e2e
+
+# The tagged GUI is written to its own subdirectory rather than over
+# $(BUILD_DIR)/chairlift. The staged-install E2E test runs `make install`,
+# which depends on `build` and would otherwise replace the tagged binary with
+# an untagged one mid-suite, silently disabling the walkthrough's Bluefin
+# rows.
+E2E_BUILD_DIR=$(BUILD_DIR)/e2e
+
+build-e2e: build
+	@mkdir -p $(E2E_BUILD_DIR)
+	CGO_ENABLED=$(CGO_ENABLED) $(GOBUILD) -tags $(E2E_TAGS) -o $(E2E_BUILD_DIR)/$(BINARY_NAME) ./cmd/chairlift
+
+# End-to-end smoke tests require GTK4, Libadwaita, dbus-run-session, and Xvfb;
+# the screenshot walkthrough additionally requires Xvfb, xdotool, xdpyinfo,
+# and xwd. They run separately from ci because the ordinary unit-test gate is
 # intentionally usable on hosts without those runtime libraries.
-e2e: build
+#
+# Only the GUI is built with E2E_TAGS. Both privileged helpers are built
+# exactly as they ship, so the boundary assertions in test/e2e exercise the
+# real binaries.
+e2e: build-e2e
 	CHAIRLIFT_E2E_BUILD_DIR=$(abspath $(BUILD_DIR)) $(GOTEST) -v ./test/e2e
 
 # Development build with race detector (requires CGO)
@@ -116,6 +144,13 @@ install: build
 	install -Dm644 data/icons/hicolor/symbolic/apps/org.frostyard.ChairLift-symbolic.svg $(DESTDIR)$(ICONSDIR)/hicolor/symbolic/apps/org.frostyard.ChairLift-symbolic.svg
 	# Install updex helper binary
 	install -Dm755 $(BUILD_DIR)/$(HELPER_NAME) $(DESTDIR)$(BINDIR)/$(HELPER_NAME)
+	# Install Bluefin-family (channel switch / developer mode) helper binary
+	install -Dm755 $(BUILD_DIR)/$(UBLUE_HELPER_NAME) $(DESTDIR)$(BINDIR)/$(UBLUE_HELPER_NAME)
+	# Install the documented release-channel table template. The live file is
+	# $(CONFIGDIR)/channels.yml or /etc/chairlift/channels.yml; ChairLift's
+	# built-in table applies when neither exists, so nothing is installed to
+	# either of those paths here.
+	install -Dm644 channels.example.yml $(DESTDIR)$(DATADIR)/doc/chairlift/channels.example.yml
 	# Remove legacy passwordless rules from prior source installs
 	rm -f $(DESTDIR)$(POLKITRULESDIR)/org.frostyard.ChairLift.bootc.rules
 	rm -f $(DESTDIR)$(POLKITRULESDIR)/org.frostyard.ChairLift.updex.rules
@@ -125,6 +160,8 @@ install: build
 	install -Dm644 data/org.frostyard.ChairLift.updex.policy $(DESTDIR)$(POLKITACTIONSDIR)/org.frostyard.ChairLift.updex.policy
 	# Install PolicyKit policy for native A/B sysupdate staging
 	install -Dm644 data/org.frostyard.ChairLift.sysupdate.policy $(DESTDIR)$(POLKITACTIONSDIR)/org.frostyard.ChairLift.sysupdate.policy
+	# Install PolicyKit policy for the Bluefin-family channel/developer helper
+	install -Dm644 data/org.frostyard.ChairLift.ublue.policy $(DESTDIR)$(POLKITACTIONSDIR)/org.frostyard.ChairLift.ublue.policy
 
 # Uninstall the application
 uninstall:
@@ -136,6 +173,9 @@ uninstall:
 	rm -f $(DESTDIR)$(ICONSDIR)/hicolor/scalable/apps/org.frostyard.ChairLift-flower.svg
 	rm -f $(DESTDIR)$(ICONSDIR)/hicolor/symbolic/apps/org.frostyard.ChairLift-symbolic.svg
 	rm -f $(DESTDIR)$(BINDIR)/$(HELPER_NAME)
+	rm -f $(DESTDIR)$(BINDIR)/$(UBLUE_HELPER_NAME)
+	rm -f $(DESTDIR)$(DATADIR)/doc/chairlift/channels.example.yml
+	rm -f $(DESTDIR)$(POLKITACTIONSDIR)/org.frostyard.ChairLift.ublue.policy
 	rm -f $(DESTDIR)$(POLKITACTIONSDIR)/org.frostyard.ChairLift.bootc.policy
 	rm -f $(DESTDIR)$(POLKITRULESDIR)/org.frostyard.ChairLift.bootc.rules
 	rm -f $(DESTDIR)$(POLKITACTIONSDIR)/org.frostyard.ChairLift.updex.policy

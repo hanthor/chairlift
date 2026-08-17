@@ -238,6 +238,10 @@ func defaultConfig() *Config {
 			},
 		},
 		UpdatesPage: PageConfig{
+			// Update All leads the page: it is the one action most users
+			// need, with the per-provider groups below it for the cases it
+			// does not cover.
+			"update_all_group":        GroupConfig{Enabled: true},
 			"bootc_updates_group":     GroupConfig{Enabled: true},
 			"sysupdate_updates_group": GroupConfig{Enabled: true},
 			"flatpak_updates_group":   GroupConfig{Enabled: true},
@@ -275,6 +279,13 @@ func defaultConfig() *Config {
 		},
 		FeaturesPage: PageConfig{
 			"features_group": GroupConfig{Enabled: true},
+			// Bluefin-family groups. They are enabled by default and cost
+			// nothing on other systems: each one hides itself when
+			// internal/ublue reports no /usr/share/ublue-os/image-info.json,
+			// which is every non-Bluefin host including Snow Linux.
+			"channel_group": GroupConfig{Enabled: true},
+			"dx_group":      GroupConfig{Enabled: true},
+			"gaming_group":  GroupConfig{Enabled: true},
 		},
 		HelpPage: PageConfig{
 			"help_resources_group": GroupConfig{

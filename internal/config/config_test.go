@@ -402,13 +402,14 @@ func repoRoot() string {
 }
 
 // TestUpdatesPageDefaultGroupSetIsExact asserts that defaultConfig()'s
-// updates_page group set is exactly the five groups the Updates page view
+// updates_page group set is exactly the six groups the Updates page view
 // still builds. This is an exact-set equality check (length plus every
 // expected key present), not a single named-key absence lookup, so it fails
 // loudly whether a formerly-shipped, now-removed group is silently
 // re-added under its old name or under any new one.
 func TestUpdatesPageDefaultGroupSetIsExact(t *testing.T) {
 	want := map[string]bool{
+		"update_all_group":        true,
 		"bootc_updates_group":     true,
 		"sysupdate_updates_group": true,
 		"flatpak_updates_group":   true,

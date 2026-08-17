@@ -10,8 +10,8 @@ is YAML-configuration-driven; feature groups toggle on and off per host.
 
 The app builds pure-Go (`CGO_ENABLED=0`); the race detector needs CGO.
 
-- `make build` — builds `build/chairlift` and `build/chairlift-updex-helper`
-  (both `CGO_ENABLED=0`).
+- `make build` — builds `build/chairlift`, `build/chairlift-updex-helper`, and
+  `build/chairlift-ublue-helper` (all `CGO_ENABLED=0`).
 - `make test` — `go test ./...`.
 - `make fmt` — `gofmt -s -w .`.
 - `make lint` — `golangci-lint run`.
@@ -72,18 +72,55 @@ An agent must not break these:
   helper binaries only: `pkexec /usr/libexec/bootc-update-stage` (action
   `org.frostyard.ChairLift.bootc.stage`), `pkexec
   /usr/libexec/snosi-sysupdate-stage` (`internal/sysupdate.StageScriptPath`,
-  action `org.frostyard.ChairLift.sysupdate.stage`, native A/B hosts), and
+  action `org.frostyard.ChairLift.sysupdate.stage`, native A/B hosts),
   `pkexec /usr/bin/chairlift-updex-helper` (`internal/updex.HelperPath`, actions
-  `org.frostyard.ChairLift.updex.{enable-feature,disable-feature,update}`) —
-  always that fixed absolute path, matching the
+  `org.frostyard.ChairLift.updex.{enable-feature,disable-feature,update}`), and
+  `pkexec /usr/bin/chairlift-ublue-helper` (`internal/ublue.HelperPath`,
+  actions `org.frostyard.ChairLift.ublue.{channel-switch,dx-enable,dx-disable}`)
+  — always that fixed absolute path, matching the
   `org.freedesktop.policykit.exec.path` annotation, with the updex subcommand
   matching `org.freedesktop.policykit.exec.argv1`. The helper must strictly
   reject unsupported argv because PolicyKit does not validate arguments after
   action selection. ChairLift ships no passwordless PolicyKit rules; normal
   administrator authentication applies. Homebrew tap trust (`brew trust`) is
-  deliberately per-user and does **not** use pkexec. Do not add arbitrary
+  deliberately per-user and does **not** use pkexec, and neither does gaming
+  mode, whose components are all user-scope Flatpaks. Do not add arbitrary
   privileged command execution, broaden what pkexec runs, or route new
   mutations around the fixed helper/policy pair.
+- **Neither an image reference nor a username crosses the ublue pkexec
+  boundary.** `chairlift-ublue-helper` receives a channel word only, and
+  derives the concrete `bootc switch` target itself from the read-only image
+  descriptor plus the channel table; it derives the account to modify from
+  the `PKEXEC_UID` pkexec sets, never from argv. Accepting either as an
+  argument would let an authenticated caller switch the machine to an
+  arbitrary image, or add an arbitrary account to the privileged developer
+  groups. `internal/ublue`'s test asserts that no argument crossing the
+  boundary contains a `/`.
+- **The release-channel table is keyed on the image, never on the tag alone.**
+  `internal/imageinfo`'s `imageChannelMap` records, per registry path, which
+  tags are stable streams, which are testing streams, and how each maps to
+  the other. The entries were verified against GHCR by manifest request; the
+  comment above the map carries the observed 200/404 results. Collapsing it
+  back into a tag-keyed map reintroduces two references that do not exist
+  (`ghcr.io/ublue-os/bluefin:testing` and
+  `ghcr.io/projectbluefin/bluefin-lts:lts-testing`), which is a failed `bootc
+  switch` on a user's OS rather than a cosmetic bug. Other images are added
+  through a `channels.yml` override, which is read only from
+  `/etc/chairlift/channels.yml` and `/usr/share/chairlift/channels.yml` —
+  never the working directory, because the privileged helper resolves its
+  switch target through the same table.
+- **Update All composes; it does not add a privileged route.** `internal/updateall`
+  is the pure sequencer for the OS/Flatpak/Homebrew update run: it executes
+  nothing itself, taking every provider as a function seam whose production
+  value is the existing `internal/bootc`, `internal/flatpak`, and
+  `internal/homebrew` entry point. Its OS phase must keep going through
+  `internal/bootc`'s staging path. Adding a `bootc upgrade` route to
+  `chairlift-ublue-helper` would break both the staging-ownership invariant
+  below and the system-integration package's fixed-path contract. The run's
+  only new privileged surface is `restart`. `Summarize`'s `RestartRequired`
+  is true only when an image was genuinely staged — the stage script is
+  idempotent and exits 0 on an already-current system, so a successful OS
+  phase is not by itself evidence anything changed.
 - **OS staging execution has one owner.** `internal/stageexec` is the pure-Go
   leaf package that owns the progress event contract, merged stdout/stderr
   streaming, direct-child cancellation, error classification, completion event,

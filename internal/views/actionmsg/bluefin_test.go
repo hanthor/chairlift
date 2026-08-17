@@ -1,0 +1,98 @@
+package actionmsg
+
+import (
+	"strings"
+	"testing"
+)
+
+// Dry-run must never confirm a switch: the underlying helper call is
+// short-circuited before pkexec, so nothing changed.
+func TestChannelSwitchNeverConfirmsUnderDryRun(t *testing.T) {
+	for _, toTesting := range []bool{true, false} {
+		decision := ChannelSwitch(true, toTesting)
+		if decision.Confirm {
+			t.Errorf("ChannelSwitch(true, %v).Confirm = true, want false", toTesting)
+		}
+		if !strings.Contains(decision.Toast, "[DRY-RUN]") {
+			t.Errorf("ChannelSwitch(true, %v).Toast = %q, want a dry-run preview", toTesting, decision.Toast)
+		}
+	}
+}
+
+func TestChannelSwitchConfirmsAndNamesTheChannel(t *testing.T) {
+	testing_ := ChannelSwitch(false, true)
+	if !testing_.Confirm {
+		t.Error("ChannelSwitch(false, true).Confirm = false, want true")
+	}
+	if !strings.Contains(testing_.Toast, "testing") || !strings.Contains(testing_.Toast, "Restart") {
+		t.Errorf("ChannelSwitch(false, true).Toast = %q, want it to name testing and ask for a restart", testing_.Toast)
+	}
+
+	stable := ChannelSwitch(false, false)
+	if !strings.Contains(stable.Toast, "stable") {
+		t.Errorf("ChannelSwitch(false, false).Toast = %q, want it to name stable", stable.Toast)
+	}
+}
+
+func TestDeveloperModeNeverConfirmsUnderDryRun(t *testing.T) {
+	for _, enable := range []bool{true, false} {
+		decision := DeveloperMode(true, enable)
+		if decision.Confirm {
+			t.Errorf("DeveloperMode(true, %v).Confirm = true, want false", enable)
+		}
+		if !strings.Contains(decision.Toast, "[DRY-RUN]") {
+			t.Errorf("DeveloperMode(true, %v).Toast = %q, want a dry-run preview", enable, decision.Toast)
+		}
+	}
+}
+
+func TestDeveloperModeLiveToastsAskForARelogin(t *testing.T) {
+	for _, enable := range []bool{true, false} {
+		decision := DeveloperMode(false, enable)
+		if !decision.Confirm {
+			t.Errorf("DeveloperMode(false, %v).Confirm = false, want true", enable)
+		}
+		if !strings.Contains(decision.Toast, "Log out") {
+			t.Errorf("DeveloperMode(false, %v).Toast = %q, want it to ask for a re-login", enable, decision.Toast)
+		}
+	}
+}
+
+// Gaming mode is the one toggle whose live run can partly or wholly fail,
+// so Confirm is not simply !dryRun.
+func TestGamingModeConfirmsOnlyWhenSomethingChanged(t *testing.T) {
+	tests := []struct {
+		name        string
+		dryRun      bool
+		enable      bool
+		changed     int
+		failed      int
+		skipped     int
+		wantConfirm bool
+		wantToast   string
+	}{
+		{name: "dry run", dryRun: true, enable: true, wantToast: "[DRY-RUN]"},
+		{name: "full install", enable: true, changed: 6, wantConfirm: true, wantToast: "6 gaming component(s) installed"},
+		{name: "full removal", changed: 6, wantConfirm: true, wantToast: "6 gaming component(s) removed"},
+		{name: "partial install still confirms", enable: true, changed: 4, failed: 2, wantConfirm: true, wantToast: "2 failed"},
+		{name: "total failure does not confirm", enable: true, changed: 0, failed: 6, wantConfirm: false, wantToast: "No gaming components could be installed"},
+		{name: "nothing to do still confirms", enable: true, changed: 0, wantConfirm: true, wantToast: "already in the requested state"},
+		// Everything present belongs to the system image, so removal is a
+		// no-op and the switch must not claim gaming mode is now off.
+		{name: "only system-wide components", changed: 0, skipped: 2, wantConfirm: false, wantToast: "left in place"},
+		{name: "partial removal names the skipped ones", changed: 3, skipped: 1, wantConfirm: true, wantToast: "left in place"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			decision := GamingMode(test.dryRun, test.enable, test.changed, test.failed, test.skipped)
+			if decision.Confirm != test.wantConfirm {
+				t.Errorf("GamingMode(%v, %v, %d, %d, %d).Confirm = %v, want %v",
+					test.dryRun, test.enable, test.changed, test.failed, test.skipped, decision.Confirm, test.wantConfirm)
+			}
+			if !strings.Contains(decision.Toast, test.wantToast) {
+				t.Errorf("GamingMode(...).Toast = %q, want it to contain %q", decision.Toast, test.wantToast)
+			}
+		})
+	}
+}

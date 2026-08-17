@@ -64,6 +64,14 @@ type UserHome struct {
 	brewTrustRows          map[string]*adw.ActionRow
 	outdatedRows           rowset.Tracker[*adw.ActionRow]
 
+	// Update All references
+	updateAllGroup   *adw.PreferencesGroup
+	updateAllRow     *adw.ActionRow
+	updateAllBtn     *gtk.Button
+	updateAllPhases  map[string]*adw.ActionRow
+	updateAllRestart *adw.ActionRow
+	updateAllGate    actionstate.Gate
+
 	// bootc update references
 	bootcStageExpander *adw.ExpanderRow
 	bootcStageBtn      *gtk.Button
@@ -76,6 +84,17 @@ type UserHome struct {
 	sysupdateActivityRow   *adw.ActionRow
 	sysupdateLogExpander   *adw.ExpanderRow
 	sysupdateRollbackRow   *adw.ActionRow
+
+	// Bluefin-family (channel / developer mode / gaming) references
+	channelGroup    *adw.PreferencesGroup
+	channelRow      *adw.ActionRow
+	channelSwitch   *gtk.Switch
+	developerGroup  *adw.PreferencesGroup
+	developerRow    *adw.ActionRow
+	developerSwitch *gtk.Switch
+	gamingGroup     *adw.PreferencesGroup
+	gamingRow       *adw.ActionRow
+	gamingSwitch    *gtk.Switch
 
 	// Features page references
 	featuresGroup            *adw.PreferencesGroup

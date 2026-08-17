@@ -31,6 +31,13 @@ func (uh *UserHome) buildUpdatesPage() {
 		return
 	}
 
+	// Update All leads the page: one action covering every provider this
+	// host can update. The per-provider groups below it stay available for
+	// anything it does not cover.
+	if uh.config.IsGroupEnabled("updates_page", "update_all_group") {
+		uh.buildUpdateAllGroup(page)
+	}
+
 	// bootc System Updates group - built hidden, shown asynchronously on
 	// bootc hosts that ship the update-stage script.
 	if uh.config.IsGroupEnabled("updates_page", "bootc_updates_group") {

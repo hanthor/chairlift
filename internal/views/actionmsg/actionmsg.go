@@ -336,3 +336,107 @@ func FeatureUpdate(dryRun bool) string {
 	}
 	return "Features updated. Changes apply after reboot."
 }
+
+// ChannelSwitch decides whether the Testing Channel switch should confirm
+// its new state, and what toast to show. Confirm is exactly !dryRun, for the
+// same reason as FeatureToggle: under dry-run, ublue.runHelper short-circuits
+// before pkexec, so nothing was staged and confirming the switch would show
+// a channel change that did not happen.
+func ChannelSwitch(dryRun bool, toTesting bool) FeatureToggleDecision {
+	channel := "stable"
+	if toTesting {
+		channel = "testing"
+	}
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("[DRY-RUN] Preview: would switch to the %s channel — no changes made", channel),
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   fmt.Sprintf("Switched to the %s channel. Restart to apply.", channel),
+	}
+}
+
+// DeveloperMode decides whether the Developer Mode switch should confirm its
+// new state, and what toast to show. The live toasts name the re-login
+// requirement because supplementary group membership only takes effect in a
+// new session — the switch flipping is not the whole story.
+func DeveloperMode(dryRun bool, enable bool) FeatureToggleDecision {
+	verb := "disabled"
+	if enable {
+		verb = "enabled"
+	}
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("[DRY-RUN] Preview: developer mode would be %s — no changes made", verb),
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   fmt.Sprintf("Developer mode %s. Log out and back in to apply.", verb),
+	}
+}
+
+// GamingMode decides whether the Gaming Mode switch should confirm its new
+// state, and what toast to show.
+//
+// Gaming mode differs from the other two toggles in one way that matters
+// here: it installs user-scope Flatpaks one at a time, so a live run can
+// partly succeed. Confirm therefore is not simply !dryRun — a live run that
+// changed nothing, or whose every component failed, must not confirm either.
+//
+// skipped counts components the image preinstalled system-wide, which
+// removal leaves alone. Those are neither a change nor a failure, so they
+// are reported separately: telling a user "0 removed" with no explanation
+// when the components are still visibly installed is the confusing outcome.
+func GamingMode(dryRun bool, enable bool, changed, failed, skipped int) FeatureToggleDecision {
+	verb := "removed"
+	if enable {
+		verb = "installed"
+	}
+
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("[DRY-RUN] Preview: gaming components would be %s — no changes made", verb),
+		}
+	}
+
+	suffix := ""
+	if skipped > 0 {
+		suffix = fmt.Sprintf(" %d component(s) installed system-wide were left in place.", skipped)
+	}
+
+	switch {
+	case changed == 0 && failed > 0:
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("No gaming components could be %s (%d failed).%s", verb, failed, suffix),
+		}
+	case changed == 0 && skipped > 0:
+		// Nothing was removed, but only because everything present belongs
+		// to the system image. The switch must not claim gaming mode is off.
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("Nothing to remove.%s", suffix),
+		}
+	case changed == 0:
+		return FeatureToggleDecision{
+			Confirm: true,
+			Toast:   "Gaming mode is already in the requested state.",
+		}
+	case failed > 0:
+		return FeatureToggleDecision{
+			Confirm: true,
+			Toast:   fmt.Sprintf("%d gaming component(s) %s, %d failed.%s", changed, verb, failed, suffix),
+		}
+	default:
+		return FeatureToggleDecision{
+			Confirm: true,
+			Toast:   fmt.Sprintf("%d gaming component(s) %s.%s", changed, verb, suffix),
+		}
+	}
+}

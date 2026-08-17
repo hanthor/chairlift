@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/frostyard/chairlift/internal/imageinfo"
 	"github.com/frostyard/chairlift/internal/updex"
 	"gopkg.in/yaml.v3"
 )
@@ -121,6 +122,8 @@ func TestGoreleaserNfpmLayoutMatchesUsrPrefix(t *testing.T) {
 		{"updex policy", "org.frostyard.ChairLift.updex.policy", filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.updex.policy")},
 		{"bootc policy", "org.frostyard.ChairLift.bootc.policy", filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.bootc.policy")},
 		{"sysupdate policy", "org.frostyard.ChairLift.sysupdate.policy", filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.sysupdate.policy")},
+		{"ublue policy", "org.frostyard.ChairLift.ublue.policy", filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.ublue.policy")},
+		{"channel table example", "channels.example.yml", "/usr/share/doc/chairlift/channels.example.yml"},
 	}
 
 	for i, nfpm := range cfg.Nfpms {
@@ -145,6 +148,16 @@ func TestGoreleaserNfpmLayoutMatchesUsrPrefix(t *testing.T) {
 				if content.Dst == "/etc/chairlift/config.yml" {
 					t.Errorf("nfpms[%d] packages administrator-owned /etc/chairlift/config.yml", i)
 				}
+				// The channel table decides the image reference the
+				// privileged helper hands to bootc. Packaging a live table
+				// at either read path would install a switch mapping the
+				// administrator never chose; only the documented example
+				// under /usr/share/doc is shipped.
+				for _, live := range imageinfo.SystemTablePaths {
+					if content.Dst == live {
+						t.Errorf("nfpms[%d] packages a live channel table at %s; ship only the example", i, live)
+					}
+				}
 				if strings.HasSuffix(content.Src, ".rules") || strings.HasSuffix(content.Dst, ".rules") {
 					t.Errorf("nfpms[%d] still packages passwordless PolicyKit rule: src=%q dst=%q", i, content.Src, content.Dst)
 				}
@@ -161,10 +174,10 @@ func TestGoreleaserPublishesSystemIntegrationPackage(t *testing.T) {
 	if full.ID == "" || integration.ID == "" || full.ID == integration.ID {
 		t.Errorf("nFPM ids must be non-empty and unique: full=%q integration=%q", full.ID, integration.ID)
 	}
-	if want := []string{"chairlift", "chairlift-updex-helper"}; !reflect.DeepEqual(full.IDs, want) {
+	if want := []string{"chairlift", "chairlift-updex-helper", "chairlift-ublue-helper"}; !reflect.DeepEqual(full.IDs, want) {
 		t.Errorf("%s ids = %v, want %v", fullPackageName, full.IDs, want)
 	}
-	if want := []string{"chairlift-updex-helper"}; !reflect.DeepEqual(integration.IDs, want) {
+	if want := []string{"chairlift-updex-helper", "chairlift-ublue-helper"}; !reflect.DeepEqual(integration.IDs, want) {
 		t.Errorf("%s ids = %v, want %v", integrationPackageName, integration.IDs, want)
 	}
 	if want := []string{integrationPackageName}; !reflect.DeepEqual(full.Conflicts, want) {
@@ -184,6 +197,8 @@ func TestGoreleaserPublishesSystemIntegrationPackage(t *testing.T) {
 		"org.frostyard.ChairLift.bootc.policy":     filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.bootc.policy"),
 		"org.frostyard.ChairLift.updex.policy":     filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.updex.policy"),
 		"org.frostyard.ChairLift.sysupdate.policy": filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.sysupdate.policy"),
+		"org.frostyard.ChairLift.ublue.policy":     filepath.Join(polkitActionsDir, "org.frostyard.ChairLift.ublue.policy"),
+		"channels.example.yml":                     "/usr/share/doc/chairlift/channels.example.yml",
 	}
 	if len(integration.Contents) != len(wantIntegrationContents) {
 		t.Errorf("%s contents has %d entries, want %d", integrationPackageName, len(integration.Contents), len(wantIntegrationContents))

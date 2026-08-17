@@ -67,6 +67,22 @@ builds:
       - -s -w
     main: ./cmd/chairlift-updex-helper/main.go
 
+  - id: chairlift-ublue-helper
+    binary: chairlift-ublue-helper
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w
+    main: ./cmd/chairlift-ublue-helper/main.go
+
 archives:
   - files:
       - README.md
@@ -78,6 +94,8 @@ archives:
       - data/org.frostyard.ChairLift.bootc.policy
       - data/org.frostyard.ChairLift.updex.policy
       - data/org.frostyard.ChairLift.sysupdate.policy
+      - data/org.frostyard.ChairLift.ublue.policy
+      - channels.example.yml
 
 
 checksum:
@@ -117,11 +135,13 @@ nfpms:
     ids:
       - chairlift
       - chairlift-updex-helper
+      - chairlift-ublue-helper
     file_name_template: "{{ .ConventionalFileName }}"
     package_name: frostyard-chairlift
-    # Both build ids' binaries (chairlift, chairlift-updex-helper) are
-    # packaged automatically into bindir; do not add them as contents
-    # entries (build outputs live in dist/, not the repo root).
+    # Every build id's binary (chairlift, chairlift-updex-helper,
+    # chairlift-ublue-helper) is packaged automatically into bindir; do not
+    # add them as contents entries (build outputs live in dist/, not the
+    # repo root).
     bindir: /usr/bin
     description: |-
       System management tool for bootc-based installations.
@@ -165,6 +185,19 @@ nfpms:
         dst: /usr/share/polkit-1/actions/org.frostyard.ChairLift.sysupdate.policy
         file_info:
           mode: 0644
+      # PolicyKit policy for the Bluefin-family channel/developer helper
+      - src: ./data/org.frostyard.ChairLift.ublue.policy
+        dst: /usr/share/polkit-1/actions/org.frostyard.ChairLift.ublue.policy
+        file_info:
+          mode: 0644
+      # Documented release-channel table template. Installed as an example
+      # only: the live file is /usr/share/chairlift/channels.yml (image
+      # maintainer) or /etc/chairlift/channels.yml (administrator), and
+      # ChairLift's built-in table applies when neither exists.
+      - src: ./channels.example.yml
+        dst: /usr/share/doc/chairlift/channels.example.yml
+        file_info:
+          mode: 0644
     formats:
       - deb
       - rpm
@@ -178,12 +211,13 @@ nfpms:
   - id: chairlift-system-integration
     ids:
       - chairlift-updex-helper
+      - chairlift-ublue-helper
     file_name_template: "{{ .ConventionalFileName }}"
     package_name: frostyard-chairlift-system-integration
     bindir: /usr/bin
     description: |-
       System integration for a user-scoped ChairLift installation.
-      Installs the privileged updex helper, PolicyKit policies, and maintainer configuration defaults.
+      Installs the privileged updex and ublue helpers, PolicyKit policies, and maintainer configuration defaults.
     license: GPL-3.0-or-later
     conflicts:
       - frostyard-chairlift
@@ -202,6 +236,14 @@ nfpms:
           mode: 0644
       - src: ./data/org.frostyard.ChairLift.sysupdate.policy
         dst: /usr/share/polkit-1/actions/org.frostyard.ChairLift.sysupdate.policy
+        file_info:
+          mode: 0644
+      - src: ./data/org.frostyard.ChairLift.ublue.policy
+        dst: /usr/share/polkit-1/actions/org.frostyard.ChairLift.ublue.policy
+        file_info:
+          mode: 0644
+      - src: ./channels.example.yml
+        dst: /usr/share/doc/chairlift/channels.example.yml
         file_info:
           mode: 0644
     formats:

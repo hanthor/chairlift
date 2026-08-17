@@ -10,6 +10,8 @@ import (
 
 	"github.com/frostyard/chairlift/internal/bootc"
 	"github.com/frostyard/chairlift/internal/sysupdate"
+	"github.com/frostyard/chairlift/internal/ublue"
+	"github.com/frostyard/chairlift/internal/ubluehelper"
 	"github.com/frostyard/chairlift/internal/updex"
 	"github.com/frostyard/chairlift/internal/updexhelper"
 )
@@ -159,6 +161,48 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 		},
 	})
 
+	ublueCommands := ubluehelper.SupportedCommands()
+	expectedUblueCommands := []string{
+		ubluehelper.CommandChannelSwitch,
+		ubluehelper.CommandDXEnable,
+		ubluehelper.CommandDXDisable,
+		ubluehelper.CommandRestart,
+	}
+	if !reflect.DeepEqual(ublueCommands, expectedUblueCommands) {
+		t.Fatalf("ubluehelper.SupportedCommands() = %v, want %v", ublueCommands, expectedUblueCommands)
+	}
+
+	assertPolicyActions(t, "org.frostyard.ChairLift.ublue.policy", []expectedPolicyAction{
+		{
+			ID:          "org.frostyard.ChairLift.ublue.channel-switch",
+			Description: "Switch the system release channel",
+			Message:     "Authentication is required to switch the system release channel",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandChannelSwitch,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.dx-enable",
+			Description: "Enable developer mode",
+			Message:     "Authentication is required to enable developer mode",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandDXEnable,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.dx-disable",
+			Description: "Disable developer mode",
+			Message:     "Authentication is required to disable developer mode",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandDXDisable,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.restart",
+			Description: "Restart the system",
+			Message:     "Authentication is required to restart the system",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandRestart,
+		},
+	})
+
 	assertPolicyActions(t, "org.frostyard.ChairLift.bootc.policy", []expectedPolicyAction{
 		{
 			ID:          "org.frostyard.ChairLift.bootc.stage",
@@ -183,6 +227,7 @@ func TestPolkitPasswordlessRulesAreAbsent(t *testing.T) {
 		"org.frostyard.ChairLift.updex.rules",
 		"org.frostyard.ChairLift.bootc.rules",
 		"org.frostyard.ChairLift.sysupdate.rules",
+		"org.frostyard.ChairLift.ublue.rules",
 	} {
 		t.Run(name, func(t *testing.T) {
 			path := filepath.Join(RepoRoot(), "data", name)
@@ -215,5 +260,48 @@ func TestEveryUpdexCommandHasOnePolicyAction(t *testing.T) {
 	}
 	if t.Failed() {
 		t.Logf("supported commands: %v", updexhelper.SupportedCommands())
+	}
+}
+
+// The ublue analogue of TestEveryUpdexCommandHasOnePolicyAction: pkexec
+// selects an action from the executable path and argv1, so a command with no
+// action cannot be authorized at all, and an action selecting a command the
+// helper rejects authorizes a privilege for nothing.
+func TestEveryUblueCommandHasOnePolicyAction(t *testing.T) {
+	document := loadPolicy(t, "org.frostyard.ChairLift.ublue.policy")
+	counts := make(map[string]int)
+	for _, action := range document.Actions {
+		for _, annotation := range action.Annotations {
+			if annotation.Key == execArgv1Annotation {
+				counts[annotation.Value]++
+			}
+		}
+	}
+
+	for _, command := range ubluehelper.SupportedCommands() {
+		if counts[command] != 1 {
+			t.Errorf("PolicyKit actions selecting argv1=%q = %d, want exactly 1", command, counts[command])
+		}
+		delete(counts, command)
+	}
+	for command, count := range counts {
+		t.Errorf("PolicyKit policy selects unsupported helper command %q in %d action(s)", command, count)
+	}
+	if t.Failed() {
+		t.Logf("supported commands: %v", ubluehelper.SupportedCommands())
+	}
+}
+
+// The two privileged helpers must stay distinct binaries with distinct
+// action namespaces. A shared path would let an action authorized for one
+// command surface select a subcommand of the other.
+func TestPrivilegedHelperPathsAreDistinct(t *testing.T) {
+	if ublue.HelperPath == updex.HelperPath {
+		t.Fatalf("ublue.HelperPath and updex.HelperPath are both %q; each helper needs its own fixed path", ublue.HelperPath)
+	}
+	for _, path := range []string{ublue.HelperPath, updex.HelperPath} {
+		if !filepath.IsAbs(path) {
+			t.Errorf("helper path %q is not absolute; pkexec would fall back to the generic run-program action", path)
+		}
 	}
 }

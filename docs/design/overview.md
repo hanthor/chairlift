@@ -1094,6 +1094,120 @@ path comparison miss and falls `pkexec` back to the generic, more restrictive
 action. `internal/updex/updex.go`'s `runHelper` therefore always invokes
 `HelperPath` (never a bare name).
 
+**The Bluefin-family helper.** The release-channel switch and developer-mode
+toggle use a second fixed-path helper, `internal/ublue.HelperPath`
+(`/usr/bin/chairlift-ublue-helper`), with its own policy file
+`data/org.frostyard.ChairLift.ublue.policy` declaring the three actions
+`org.frostyard.ChairLift.ublue.{channel-switch,dx-enable,dx-disable}`. It
+follows the updex helper's contract exactly — fixed absolute `exec.path`, one
+`exec.argv1` per action, and a pure `internal/ubluehelper.ParseInvocation`
+boundary that accepts only `channel-switch <stable|testing> [--dry-run]`,
+`dx-enable [--dry-run]`, and `dx-disable [--dry-run]`.
+
+Two inputs deliberately never cross the pkexec boundary as arguments:
+
+- **The target image reference.** Only a channel word is passed. The helper
+  resolves the concrete reference itself, from the read-only image descriptor
+  at `internal/imageinfo.DescriptorPath` and the channel table below. An
+  authenticated caller therefore cannot direct `bootc switch` at an arbitrary
+  registry.
+- **The username.** The helper resolves it from the `PKEXEC_UID` that pkexec
+  sets on the invoking session (`internal/ubluehelper.TargetUID`, which
+  rejects an absent, non-numeric, or root value), so an authenticated caller
+  cannot add an unrelated account to the privileged developer groups.
+
+Gaming mode, the third Bluefin-family feature, crosses no privilege boundary
+at all: every component is a user-scope Flatpak installed with
+`flatpak install --user`, the same reasoning that keeps Homebrew tap trust
+unprivileged.
+
+### Update All
+
+`internal/updateall` sequences the one-action update that both bluefinctl
+(`bctl update`) and finupdate (the hero button) lead with. It is a pure
+package: `Plan` selects the phases available on this host, `Runner.Run`
+executes them through function seams, and `Summarize` aggregates the outcome.
+Nothing in it executes a command directly, which is why the whole
+ordering/failure/cancellation/restart matrix is table-tested on a host with
+no bootc, Flatpak, or Homebrew.
+
+Each exported function's distinct outcomes:
+
+- `Plan` returns the phases in execution order — OS image, then applications,
+  then Homebrew packages — omitting any whose provider is absent. An empty
+  plan means Update All is not offered at all.
+- `Runner.Run` emits one `EventPhaseStarted` and one `EventPhaseFinished` per
+  planned phase, plus `EventMessage` for each streamed output line, and
+  returns one `Result` per phase. A phase failure does **not** abort the run:
+  applications and packages are independent of the OS image and of each
+  other. Context cancellation is the one exception and marks every remaining
+  phase `OutcomeSkipped`. A nil provider seam yields `OutcomeFailed`, never
+  success. Events are dropped rather than blocking when nothing is receiving.
+- `Summarize` produces the counts, the `FailedPhases` list, `RestartRequired`,
+  and one `Headline`. The distinct headlines are: nothing planned, every phase
+  failed, some failed with a staged image, some failed without one, cancelled,
+  a restart is pending, and everything was already current.
+
+`RestartRequired` deserves its own note: the OS phase stages an image rather
+than applying it, and the stage script is idempotent — it exits 0 without
+staging when the system is already current. So the phase's success is not
+evidence that anything changed. The decision comes from the `StagedAfter`
+probe re-reading `bootc status`, and a missing probe resolves to "no restart
+needed" rather than to a spurious prompt.
+
+The restart itself is the run's only new privileged surface: a `restart`
+subcommand on `chairlift-ublue-helper` running `systemctl reboot`, with a
+fixed argv that takes no delay and no target. Scheduled restarts
+(finupdate's "Restart Tonight", bluefinctl's reboot-on-logout) would each
+need their own action rather than a parameter here, precisely because a time
+argument crossing the boundary is another value the caller would control.
+
+### The release-channel table
+
+`internal/imageinfo` owns the mapping from a running image and tag to the tag
+its stable or testing counterpart is published under. The mapping is keyed on
+the **registry path**, not on the tag alone, because the same tag word means
+different things across images. Verified against GHCR by manifest request on
+2026-08-17:
+
+| Image | Stable streams | Testing streams |
+| --- | --- | --- |
+| `ghcr.io/ublue-os/bluefin` | `latest`, `stable`, `stable-daily`, `gts`, `beta`, `lts`, `lts-hwe` | `lts-testing`, `lts-hwe-testing` |
+| `ghcr.io/projectbluefin/bluefin-lts` | `lts`, `stable` | `testing` |
+| `ghcr.io/projectbluefin/dakota` | `latest`, `stable` | `testing` |
+
+Two consequences follow, both of which a tag-only mapping gets wrong:
+
+- `ghcr.io/ublue-os/bluefin:testing` does not exist. A Bluefin Stable host on
+  `latest`, `stable`, `gts`, or `beta` has **no testing counterpart**, and the
+  Testing Channel switch is correctly rendered insensitive there. Only the
+  `lts` and `lts-hwe` streams on that image are switchable.
+- `ghcr.io/projectbluefin/bluefin-lts:lts-testing` does not exist either; that
+  image's testing stream is the bare `testing` tag.
+
+bluefinctl's `bctl toggle-testing` uses a tag-only map that targets both of
+those nonexistent references. ChairLift does not reproduce it.
+
+An image outside the table resolves to no channel and no switch, rather than
+to a guessed tag suffix. Other images — TunaOS, a downstream rebuild, a
+private registry — are added by shipping a `channels.yml`, not by editing Go:
+
+| Path | Owner |
+| --- | --- |
+| `/etc/chairlift/channels.yml` | administrator |
+| `/usr/share/chairlift/channels.yml` | image maintainer |
+
+Those two paths, in that order, are the only ones consulted. Unlike
+`internal/config`'s search order they deliberately exclude the working
+directory: the privileged helper resolves its `bootc switch` target through
+this same table, so a user-writable table would let a local user redirect an
+authenticated system switch. Both the GUI and the helper call
+`imageinfo.LoadSystemTable()` at startup so the two always agree. A file that
+fails validation is rejected whole — a half-applied mapping is exactly the
+situation that produces a wrong switch target. `channels.example.yml`
+documents the format and is installed to `/usr/share/doc/chairlift/`; no live
+table is ever packaged.
+
 Separately, `polkitd` reads application policies from the fixed directory
 `/usr/share/polkit-1/actions` — not `$XDG_DATA_DIRS`, not any
 `$PREFIX`-derived path — so the Makefile's `install`/`uninstall` targets
@@ -1264,6 +1378,10 @@ page_name:
 - `bootc` + `/usr/libexec/bootc-update-stage` (both optional; UI gated on `bootc.IsBootcBootedCached()`, i.e. `bootc status` reporting a non-null `booted` deployment — not on any sentinel file)
 - `/usr/lib/snosi/native-ab` marker + `/usr/libexec/snosi-sysupdate-stage` (both optional, shipped by native A/B OS images; UI gated on `sysupdate.IsNativeABCached()` and `sysupdate.StageScriptAvailable()`)
 - Updex features configured on the system (optional; read via Go library, writes via `chairlift-updex-helper`)
+- `/usr/share/ublue-os/image-info.json` (optional; present on Bluefin, Bluefin LTS, and Dakota). Its absence is the normal case on Snow Linux and hides the three Bluefin-family groups entirely
+- `bootc` (optional; used by `chairlift-ublue-helper` for the release-channel switch)
+- `usermod`/`gpasswd` (optional; used by `chairlift-ublue-helper` for developer mode)
+- Flatpak with a Flathub remote (optional; gaming mode installs its components user-scoped)
 
 ### Key external Go dependencies
 

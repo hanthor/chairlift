@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+
+<policyconfig>
+  <vendor>Frostyard</vendor>
+  <vendor_url>https://github.com/frostyard/chairlift</vendor_url>
+  <icon_name>org.frostyard.ChairLift</icon_name>
+
+  <action id="org.frostyard.ChairLift.ublue.channel-switch">
+    <description>Switch the system release channel</description>
+    <message>Authentication is required to switch the system release channel</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">channel-switch</annotate>
+  </action>
+
+  <action id="org.frostyard.ChairLift.ublue.dx-enable">
+    <description>Enable developer mode</description>
+    <message>Authentication is required to enable developer mode</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">dx-enable</annotate>
+  </action>
+
+  <action id="org.frostyard.ChairLift.ublue.dx-disable">
+    <description>Disable developer mode</description>
+    <message>Authentication is required to disable developer mode</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">dx-disable</annotate>
+  </action>
+
+  <action id="org.frostyard.ChairLift.ublue.restart">
+    <description>Restart the system</description>
+    <message>Authentication is required to restart the system</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">restart</annotate>
+  </action>
+
+</policyconfig>

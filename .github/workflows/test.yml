@@ -97,13 +97,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
             dbus-x11 \
+            imagemagick \
             libadwaita-1-0 \
             libgtk-4-1 \
+            x11-utils \
             xauth \
+            xdotool \
             xvfb
 
+      # imagemagick (import), x11-utils (xdpyinfo), and xdotool are the
+      # screenshot walkthrough's additional requirements; the GTK runtime
+      # above already covers the startup smoke test.
       - name: Run E2E tests
+        env:
+          CHAIRLIFT_WALKTHROUGH_DIR: ${{ github.workspace }}/walkthrough
         run: make e2e
+
+      - name: Upload walkthrough screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: walkthrough-screenshots
+          path: walkthrough/
+          if-no-files-found: warn
 
   verify:
     name: Verify

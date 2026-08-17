@@ -30,6 +30,35 @@
 - **System Performance**: Quick access to Mission Center for detailed system monitoring
 - **Health Overview**: Check system diagnostics and health status
 
+### 🖥️ Bluefin, Bluefin LTS & Dakota
+
+On [Bluefin](https://projectbluefin.io), Bluefin LTS, and Dakota, ChairLift adds
+three switches ported from [bluefinctl](https://github.com/projectbluefin/bluefinctl).
+Each hides itself on a system without `/usr/share/ublue-os/image-info.json`,
+so they cost nothing on Snow Linux or any other host.
+
+- **Testing Channel**: Stage a `bootc switch` between the stable and testing
+  release streams, then restart to apply. ChairLift resolves the target
+  reference from a per-image table rather than a tag suffix, so it never
+  targets a tag the image does not publish — which also means the switch is
+  correctly unavailable on Bluefin Stable's `latest`/`stable`/`gts`/`beta`
+  streams, where no testing image exists. Downstream images add themselves
+  through `channels.yml`; see [`channels.example.yml`](channels.example.yml)
+- **Developer Mode**: Join the container, VM, and serial-device groups
+  (`docker`, `incus-admin`, `libvirt`, `dialout`), effective at next login.
+  This is group membership, not a rebase to a `-dx` image
+- **Gaming Mode**: Install Steam, ProtonUp-Qt, Protontricks, MangoHud,
+  GOverlay, and Flatseal as user Flatpaks — nothing is layered onto the system
+  image, so a system update never has to reconcile it
+
+### 🔄 Update All
+
+One action brings the whole system up to date — the OS image, Flatpak
+applications, and Homebrew packages — with per-phase status and a single
+restart prompt. The prompt appears only when an OS image was actually staged,
+so a system that was already current never asks for a reboot. A phase that
+fails does not stop the others.
+
 ### 🔧 Updates & Maintenance
 
 - **System Updates**: On bootc-based systems, download and stage the next OS image update (applied on restart) and view booted/staged/rollback deployment status; on native A/B (systemd-sysupdate) installs, stage the next image the same way and see the previous version available for boot-menu rollback

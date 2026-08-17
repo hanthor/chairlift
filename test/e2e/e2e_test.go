@@ -139,6 +139,7 @@ func TestInstalledBundleAndHelperBoundary(t *testing.T) {
 		"usr/bin/chairlift",
 		"usr/bin/chairlift-wrapper",
 		"usr/bin/chairlift-updex-helper",
+		"usr/bin/chairlift-ublue-helper",
 	}
 	for _, path := range executables {
 		requireExecutable(t, filepath.Join(stage, path))
@@ -153,6 +154,8 @@ func TestInstalledBundleAndHelperBoundary(t *testing.T) {
 		"usr/share/polkit-1/actions/org.frostyard.ChairLift.bootc.policy",
 		"usr/share/polkit-1/actions/org.frostyard.ChairLift.updex.policy",
 		"usr/share/polkit-1/actions/org.frostyard.ChairLift.sysupdate.policy",
+		"usr/share/polkit-1/actions/org.frostyard.ChairLift.ublue.policy",
+		"usr/share/doc/chairlift/channels.example.yml",
 	} {
 		if info, err := os.Stat(filepath.Join(stage, path)); err != nil {
 			t.Errorf("staged install is missing %s: %v", path, err)
@@ -165,20 +168,53 @@ func TestInstalledBundleAndHelperBoundary(t *testing.T) {
 		t.Errorf("staged install created administrator-owned /etc/chairlift/config.yml: %v", err)
 	}
 
-	helper := filepath.Join(stage, "usr/bin/chairlift-updex-helper")
+	// The channel table decides the image reference the privileged helper
+	// hands to bootc, so installing a live one would apply a switch mapping
+	// nobody chose. Only the example under /usr/share/doc is shipped.
+	for _, live := range []string{"etc/chairlift/channels.yml", "usr/share/chairlift/channels.yml"} {
+		if _, err := os.Stat(filepath.Join(stage, live)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("staged install created a live channel table at %s: %v", live, err)
+		}
+	}
+
+	// PolicyKit authenticates the action and matches only the executable
+	// path and argv1, so every shape below reaches a root process on a real
+	// system. Both helpers must reject them before doing anything.
 	tests := []struct {
 		name       string
+		helper     string
 		args       []string
 		wantStderr string
 	}{
-		{name: "missing command", wantStderr: "usage: chairlift-updex-helper"},
-		{name: "unknown command", args: []string{"unknown"}, wantStderr: "unknown command: unknown"},
-		{name: "missing feature", args: []string{"enable-feature"}, wantStderr: "usage: chairlift-updex-helper enable-feature"},
+		{name: "updex missing command", helper: "chairlift-updex-helper", wantStderr: "usage: chairlift-updex-helper"},
+		{name: "updex unknown command", helper: "chairlift-updex-helper", args: []string{"unknown"}, wantStderr: "unknown command: unknown"},
+		{name: "updex missing feature", helper: "chairlift-updex-helper", args: []string{"enable-feature"}, wantStderr: "usage: chairlift-updex-helper enable-feature"},
+
+		{name: "ublue missing command", helper: "chairlift-ublue-helper", wantStderr: "usage: chairlift-ublue-helper"},
+		{name: "ublue unknown command", helper: "chairlift-ublue-helper", args: []string{"powerwash"}, wantStderr: "unknown command: powerwash"},
+		{name: "ublue channel switch without a channel", helper: "chairlift-ublue-helper", args: []string{"channel-switch"}, wantStderr: "usage: chairlift-ublue-helper channel-switch"},
+		{name: "ublue channel switch with unknown channel", helper: "chairlift-ublue-helper", args: []string{"channel-switch", "nightly"}, wantStderr: "usage: chairlift-ublue-helper channel-switch"},
+		// The argument that matters most: an image reference must never be
+		// accepted in place of a channel word, or an authenticated caller
+		// could point `bootc switch` at any registry.
+		{name: "ublue channel switch with an image ref", helper: "chairlift-ublue-helper", args: []string{"channel-switch", "ghcr.io/evil/image:latest"}, wantStderr: "usage: chairlift-ublue-helper channel-switch"},
+		{name: "ublue dx enable with a username", helper: "chairlift-ublue-helper", args: []string{"dx-enable", "root"}, wantStderr: "usage: chairlift-ublue-helper dx-enable"},
+		{name: "ublue dx disable with a group", helper: "chairlift-ublue-helper", args: []string{"dx-disable", "wheel"}, wantStderr: "usage: chairlift-ublue-helper dx-disable"},
+		// PKEXEC_UID is absent outside a pkexec session, so a direct
+		// invocation cannot resolve a user to modify.
+		{name: "ublue dx enable outside pkexec", helper: "chairlift-ublue-helper", args: []string{"dx-enable"}, wantStderr: "PKEXEC_UID is not set"},
+		// Restart takes no delay and no target: either would be a value the
+		// caller controls crossing an authenticated boundary.
+		{name: "ublue restart with a delay", helper: "chairlift-ublue-helper", args: []string{"restart", "02:00"}, wantStderr: "usage: chairlift-ublue-helper restart"},
+		{name: "ublue restart with a flag", helper: "chairlift-ublue-helper", args: []string{"restart", "--force"}, wantStderr: "usage: chairlift-ublue-helper restart"},
+		{name: "ublue restart with extra argument", helper: "chairlift-ublue-helper", args: []string{"restart", "--dry-run", "now"}, wantStderr: "usage: chairlift-ublue-helper restart"},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			helper := filepath.Join(stage, "usr/bin", test.helper)
 			cmd := exec.Command(helper, test.args...)
+			cmd.Env = append(os.Environ(), "PKEXEC_UID=")
 			var stdout bytes.Buffer
 			var stderr bytes.Buffer
 			cmd.Stdout = &stdout

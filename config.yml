@@ -13,6 +13,10 @@ system_page:
     app_id: io.missioncenter.MissionCenter
 
 updates_page:
+  # Update All leads the page; the per-provider groups below it remain
+  # available for anything it does not cover.
+  update_all_group:
+    enabled: true
   bootc_updates_group:
     enabled: true
   sysupdate_updates_group:
@@ -57,6 +61,15 @@ maintenance_page:
 
 features_page:
   features_group:
+    enabled: true
+  # Bluefin-family groups (Bluefin, Bluefin LTS, Dakota). Each hides itself
+  # on a host with no /usr/share/ublue-os/image-info.json, so leaving them
+  # enabled is safe on every other system.
+  channel_group:
+    enabled: true
+  dx_group:
+    enabled: true
+  gaming_group:
     enabled: true
 
 help_page:

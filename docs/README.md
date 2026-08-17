@@ -83,6 +83,7 @@ current behavior):
 - [plans/2026-02-27-feature-update-check-design.md](plans/2026-02-27-feature-update-check-design.md)
 - [plans/2026-03-04-puregotk-alignment-design.md](plans/2026-03-04-puregotk-alignment-design.md)
 - [plans/2026-03-04-puregotk-alignment-plan.md](plans/2026-03-04-puregotk-alignment-plan.md)
+- [plans/2026-08-17-bluefin-suite-parity-plan.md](plans/2026-08-17-bluefin-suite-parity-plan.md)
 
 ### Process and policy docs (uncategorized, indexed in place)
 

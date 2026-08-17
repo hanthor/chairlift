@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/frostyard/chairlift/internal/gaming"
+	"github.com/frostyard/chairlift/internal/imageinfo"
+	"github.com/frostyard/chairlift/internal/ublue"
 	"github.com/frostyard/chairlift/internal/updex"
 	"github.com/frostyard/chairlift/internal/views/actionmsg"
 	"github.com/frostyard/chairlift/internal/views/featurestatus"
@@ -21,6 +24,8 @@ func (uh *UserHome) buildFeaturesPage() {
 	if page == nil {
 		return
 	}
+
+	uh.buildBluefinGroups(page)
 
 	if uh.config.IsGroupEnabled("features_page", "features_group") {
 		// Build the features group (shown if updex is available)
@@ -230,6 +235,290 @@ func (uh *UserHome) onUpdateFeaturesClicked(button *gtk.Button) {
 			}
 
 			uh.toastAdder.ShowToast(actionmsg.FeatureUpdate(updex.IsDryRun()))
+		})
+	}()
+}
+
+// ── Bluefin-family groups ────────────────────────────────────────────────
+//
+// The three groups below are ChairLift's port of bluefinctl's system
+// features to Bluefin, Bluefin LTS, and Dakota. They are independent of the
+// updex features group above: updex is Snow Linux's feature manager and does
+// not exist on a Bluefin host, so hanging these off updex availability would
+// make them invisible on exactly the systems they are for. Each group
+// instead hides itself when internal/ublue reports no ublue-os image
+// descriptor, which is every non-Bluefin host including Snow Linux.
+
+// buildBluefinGroups builds the release-channel, developer-mode, and
+// gaming-mode groups. It is called from buildFeaturesPage.
+func (uh *UserHome) buildBluefinGroups(page *adw.PreferencesPage) {
+	channelEnabled := uh.config.IsGroupEnabled("features_page", "channel_group")
+	dxEnabled := uh.config.IsGroupEnabled("features_page", "dx_group")
+	gamingEnabled := uh.config.IsGroupEnabled("features_page", "gaming_group")
+
+	if !channelEnabled && !dxEnabled && !gamingEnabled {
+		return
+	}
+
+	// One detection serves all three groups. It reads only local files, so
+	// it is cheap, but it is still done off the main thread and cached.
+	status := ublue.StatusCached()
+	if !status.Available {
+		return
+	}
+
+	description := pageview.BluefinGroupDescription(status.Variant.DisplayName(), status.Tag)
+
+	// A single structured readiness marker. The screenshot walkthrough
+	// asserts on this line to confirm the captured session really built the
+	// Bluefin-family rows, rather than capturing a page where they were
+	// silently hidden and calling the frame "rendered".
+	log.Printf("views: bluefin groups built variant=%s tag=%s channel=%s switchable=%v developer=%v channel_group=%v dx_group=%v gaming_group=%v",
+		status.Variant, status.Tag, status.Channel,
+		status.CanSwitchTo != imageinfo.ChannelUnknown, status.Developer,
+		channelEnabled, dxEnabled, gamingEnabled)
+
+	if channelEnabled {
+		uh.buildChannelGroup(page, status, description)
+	}
+	if dxEnabled {
+		uh.buildDeveloperGroup(page, status)
+	}
+	if gamingEnabled {
+		uh.buildGamingGroup(page)
+	}
+}
+
+// buildChannelGroup builds the release-channel switch. The switch is
+// insensitive when the running image publishes no counterpart tag — every
+// Bluefin Stable host, for one — because there is no reference to hand
+// bootc. See internal/imageinfo's channel table.
+func (uh *UserHome) buildChannelGroup(page *adw.PreferencesPage, status ublue.Status, description string) {
+	group := adw.NewPreferencesGroup()
+	group.SetTitle("Release Channel")
+	group.SetDescription(description)
+
+	onTesting := status.Channel == imageinfo.ChannelTesting
+	switchable := status.CanSwitchTo != imageinfo.ChannelUnknown
+	presentation := pageview.ChannelRow(onTesting, switchable, status.Tag)
+
+	row := adw.NewActionRow()
+	row.SetTitle(presentation.Title)
+	row.SetSubtitle(presentation.Subtitle)
+
+	toggle := gtk.NewSwitch()
+	toggle.SetActive(onTesting)
+	toggle.SetValign(gtk.AlignCenterValue)
+	toggle.SetSensitive(switchable)
+
+	sw := toggle
+	channelRow := row
+	stateSetCb := func(_ gtk.Switch, state bool) bool {
+		uh.onChannelToggled(state, sw, channelRow)
+		return true // block the visual change until the switch is confirmed
+	}
+	toggle.ConnectStateSet(&stateSetCb)
+
+	row.AddSuffix(&toggle.Widget)
+	if switchable {
+		row.SetActivatableWidget(&toggle.Widget)
+	}
+	group.Add(&row.Widget)
+
+	page.Add(group)
+	uh.channelGroup = group
+	uh.channelRow = row
+	uh.channelSwitch = toggle
+}
+
+// buildDeveloperGroup builds the developer-mode switch.
+func (uh *UserHome) buildDeveloperGroup(page *adw.PreferencesPage, status ublue.Status) {
+	group := adw.NewPreferencesGroup()
+	group.SetTitle("Developer Mode")
+	// Bluefin also publishes separate -dx images, and a user who has seen
+	// those will expect this switch to rebase them. Say plainly that it does
+	// not: this is group membership, which is the only form of developer
+	// mode available on all three supported images (Dakota publishes no -dx
+	// variant at all).
+	group.SetDescription("Adds this account to the container, VM, and serial-device groups — it does not rebase to a -dx image")
+
+	presentation := pageview.DeveloperRow(status.Developer, status.DevGroups)
+
+	row := adw.NewActionRow()
+	row.SetTitle(presentation.Title)
+	row.SetSubtitle(presentation.Subtitle)
+
+	toggle := gtk.NewSwitch()
+	toggle.SetActive(status.Developer)
+	toggle.SetValign(gtk.AlignCenterValue)
+
+	sw := toggle
+	dxRow := row
+	stateSetCb := func(_ gtk.Switch, state bool) bool {
+		uh.onDeveloperToggled(state, sw, dxRow)
+		return true
+	}
+	toggle.ConnectStateSet(&stateSetCb)
+
+	row.AddSuffix(&toggle.Widget)
+	row.SetActivatableWidget(&toggle.Widget)
+	group.Add(&row.Widget)
+
+	page.Add(group)
+	uh.developerGroup = group
+	uh.developerRow = row
+	uh.developerSwitch = toggle
+}
+
+// buildGamingGroup builds the gaming-mode switch. Its state is unknown until
+// the Flatpak query returns, so the switch starts insensitive and is
+// populated asynchronously.
+func (uh *UserHome) buildGamingGroup(page *adw.PreferencesPage) {
+	group := adw.NewPreferencesGroup()
+	group.SetTitle("Gaming")
+	group.SetDescription("Installs the gaming stack as user Flatpaks — nothing is layered onto the system image")
+
+	row := adw.NewActionRow()
+	presentation := pageview.GamingRow("Checking installed components...")
+	row.SetTitle(presentation.Title)
+	row.SetSubtitle(presentation.Subtitle)
+
+	toggle := gtk.NewSwitch()
+	toggle.SetValign(gtk.AlignCenterValue)
+	toggle.SetSensitive(false)
+
+	sw := toggle
+	gamingRow := row
+	stateSetCb := func(_ gtk.Switch, state bool) bool {
+		uh.onGamingToggled(state, sw, gamingRow)
+		return true
+	}
+	toggle.ConnectStateSet(&stateSetCb)
+
+	row.AddSuffix(&toggle.Widget)
+	row.SetActivatableWidget(&toggle.Widget)
+	group.Add(&row.Widget)
+
+	page.Add(group)
+	uh.gamingGroup = group
+	uh.gamingRow = row
+	uh.gamingSwitch = toggle
+
+	go uh.refreshGamingState()
+}
+
+// refreshGamingState queries installed Flatpaks off the main thread and
+// applies the result to the gaming row.
+func (uh *UserHome) refreshGamingState() {
+	state, err := gaming.Status()
+
+	sgtk.RunOnMainThread(func() {
+		if uh.gamingRow == nil || uh.gamingSwitch == nil {
+			return
+		}
+		if err != nil {
+			uh.gamingRow.SetSubtitle(fmt.Sprintf("Unavailable: %v", err))
+			return
+		}
+		uh.gamingSwitch.SetSensitive(true)
+		uh.gamingSwitch.SetActive(state.Enabled)
+		uh.gamingRow.SetSubtitle(pageview.GamingRow(state.Summary()).Subtitle)
+	})
+}
+
+// onChannelToggled stages a release-channel switch.
+func (uh *UserHome) onChannelToggled(toTesting bool, toggle *gtk.Switch, row *adw.ActionRow) {
+	channel := imageinfo.ChannelStable
+	if toTesting {
+		channel = imageinfo.ChannelTesting
+	}
+
+	toggle.SetSensitive(false)
+
+	go func() {
+		ctx, cancel := ublue.DefaultContext()
+		defer cancel()
+
+		err := ublue.SwitchChannel(ctx, channel)
+
+		sgtk.RunOnMainThread(func() {
+			toggle.SetSensitive(true)
+
+			if err != nil {
+				toggle.SetActive(!toTesting)
+				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Channel switch failed: %v", err))
+				return
+			}
+
+			decision := actionmsg.ChannelSwitch(ublue.IsDryRun(), toTesting)
+			toggle.SetActive(decision.Confirm == toTesting)
+			if decision.Confirm {
+				row.SetSubtitle(pageview.ChannelSwitchResultSubtitle(toTesting))
+			}
+			uh.toastAdder.ShowToast(decision.Toast)
+		})
+	}()
+}
+
+// onDeveloperToggled adds or removes this account's developer groups.
+func (uh *UserHome) onDeveloperToggled(enabled bool, toggle *gtk.Switch, row *adw.ActionRow) {
+	toggle.SetSensitive(false)
+
+	go func() {
+		ctx, cancel := ublue.DefaultContext()
+		defer cancel()
+
+		err := ublue.SetDeveloperMode(ctx, enabled)
+
+		sgtk.RunOnMainThread(func() {
+			toggle.SetSensitive(true)
+
+			if err != nil {
+				toggle.SetActive(!enabled)
+				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Developer mode failed: %v", err))
+				return
+			}
+
+			decision := actionmsg.DeveloperMode(ublue.IsDryRun(), enabled)
+			toggle.SetActive(decision.Confirm == enabled)
+			if decision.Confirm {
+				row.SetSubtitle(pageview.DeveloperResultSubtitle(enabled))
+			}
+			uh.toastAdder.ShowToast(decision.Toast)
+		})
+	}()
+}
+
+// onGamingToggled installs or removes the gaming stack. Unlike the other two
+// toggles this one can partly succeed, so the decision to confirm the switch
+// comes from actionmsg.GamingMode rather than from the absence of an error.
+func (uh *UserHome) onGamingToggled(enabled bool, toggle *gtk.Switch, row *adw.ActionRow) {
+	toggle.SetSensitive(false)
+	row.SetSubtitle("Working...")
+
+	go func() {
+		var changed, skipped []string
+		var failures []error
+		if enabled {
+			changed, failures = gaming.Enable()
+		} else {
+			changed, skipped, failures = gaming.Disable()
+		}
+
+		sgtk.RunOnMainThread(func() {
+			toggle.SetSensitive(true)
+
+			decision := actionmsg.GamingMode(ublue.IsDryRun(), enabled, len(changed), len(failures), len(skipped))
+			toggle.SetActive(decision.Confirm == enabled)
+			row.SetSubtitle(pageview.GamingResultSubtitle(enabled, len(changed), len(failures)))
+
+			if len(failures) > 0 {
+				uh.toastAdder.ShowErrorToast(decision.Toast)
+			} else {
+				uh.toastAdder.ShowToast(decision.Toast)
+			}
+
+			go uh.refreshGamingState()
 		})
 	}()
 }

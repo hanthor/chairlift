@@ -1,0 +1,228 @@
+package imageinfo
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"sort"
+	"strings"
+
+	"gopkg.in/yaml.v3"
+)
+
+// SystemTablePaths are the only locations a channel-table override is read
+// from, in precedence order: the administrator-owned file first, then the
+// package-maintainer default shipped with the image.
+//
+// This list is deliberately narrower than internal/config's, which also
+// searches the working directory. The channel table decides the image
+// reference the *privileged* helper hands to `bootc switch`, so a table
+// sourced from a user-writable location would let any local user redirect a
+// PolicyKit-authenticated system switch at an image of their choosing. Both
+// paths here are root-owned by construction, matching the repository's
+// invariant that the privileged path is never configurable from
+// ChairLift's user-writable configuration.
+var SystemTablePaths = []string{
+	"/etc/chairlift/channels.yml",
+	"/usr/share/chairlift/channels.yml",
+}
+
+// rawTable is the YAML shape of a channel-table file:
+//
+//	images:
+//	  ghcr.io/tuna-os/tromso:
+//	    stable_tags:  [latest, stable]
+//	    testing_tags: [testing]
+//	    to_testing:
+//	      latest: testing
+//	      stable: testing
+//	    to_stable:
+//	      testing: stable
+//
+// An entry whose key matches a built-in image replaces that built-in
+// outright rather than merging into it, so an override can remove a mapping
+// as well as add one. Any other key is added.
+type rawTable struct {
+	Images map[string]rawImageChannels `yaml:"images"`
+}
+
+type rawImageChannels struct {
+	StableTags  []string          `yaml:"stable_tags"`
+	TestingTags []string          `yaml:"testing_tags"`
+	ToTesting   map[string]string `yaml:"to_testing"`
+	ToStable    map[string]string `yaml:"to_stable"`
+}
+
+// activeTable is the channel table every lookup resolves through. It starts
+// as the built-in table and is replaced wholesale by LoadSystemTable when an
+// override file is present.
+var activeTable = builtinTable()
+
+// builtinTable returns a fresh copy of the compiled-in channel table, so a
+// caller (or an override merge) cannot mutate the package's own definition.
+func builtinTable() map[string]imageChannels {
+	result := make(map[string]imageChannels, len(imageChannelMap))
+	for ref, channels := range imageChannelMap {
+		result[ref] = channels.clone()
+	}
+	return result
+}
+
+func (c imageChannels) clone() imageChannels {
+	out := imageChannels{
+		stableTags:  append([]string(nil), c.stableTags...),
+		testingTags: append([]string(nil), c.testingTags...),
+		toTesting:   make(map[string]string, len(c.toTesting)),
+		toStable:    make(map[string]string, len(c.toStable)),
+	}
+	for from, to := range c.toTesting {
+		out.toTesting[from] = to
+	}
+	for from, to := range c.toStable {
+		out.toStable[from] = to
+	}
+	return out
+}
+
+// KnownImages returns the registry paths the active channel table covers, in
+// sorted order. It exists so the Help/diagnostics surface — and the tests —
+// can show which images ChairLift can switch channels for without reaching
+// into package internals.
+func KnownImages() []string {
+	refs := make([]string, 0, len(activeTable))
+	for ref := range activeTable {
+		refs = append(refs, ref)
+	}
+	sort.Strings(refs)
+	return refs
+}
+
+// ParseTable decodes and validates a channel-table override, returning the
+// complete table to use: the built-in entries with the file's entries
+// overlaid. It rejects a file that would produce an unusable mapping rather
+// than silently dropping the bad entry, because a half-applied table is
+// exactly the situation that produces a wrong `bootc switch` target.
+func ParseTable(reader io.Reader) (map[string]imageChannels, error) {
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("reading channel table: %w", err)
+	}
+
+	var raw rawTable
+	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
+	decoder.KnownFields(true) // a typo'd key is an error, not a silent no-op
+	if err := decoder.Decode(&raw); err != nil && !errors.Is(err, io.EOF) {
+		return nil, fmt.Errorf("parsing channel table: %w", err)
+	}
+
+	table := builtinTable()
+	for ref, entry := range raw.Images {
+		channels, err := convertEntry(ref, entry)
+		if err != nil {
+			return nil, err
+		}
+		table[ref] = channels
+	}
+	return table, nil
+}
+
+// convertEntry validates one override entry and converts it to the internal
+// form. The rules are the same invariants the built-in table's own test
+// asserts: every mapping endpoint must be a tag the same image declares, and
+// every testing tag must have a way back to stable — otherwise a host that
+// took the switch could not undo it.
+func convertEntry(ref string, entry rawImageChannels) (imageChannels, error) {
+	if ref == "" {
+		return imageChannels{}, fmt.Errorf("channel table has an entry with an empty image reference")
+	}
+	if strings.Contains(ref, ":") {
+		return imageChannels{}, fmt.Errorf("channel table key %q must be a registry path without a tag", ref)
+	}
+	if !strings.Contains(ref, "/") {
+		return imageChannels{}, fmt.Errorf("channel table key %q must be a full registry path (registry/org/image)", ref)
+	}
+	if len(entry.TestingTags) == 0 || len(entry.StableTags) == 0 {
+		return imageChannels{}, fmt.Errorf("channel table entry %q needs both stable_tags and testing_tags", ref)
+	}
+
+	channels := imageChannels{
+		stableTags:  append([]string(nil), entry.StableTags...),
+		testingTags: append([]string(nil), entry.TestingTags...),
+		toTesting:   make(map[string]string, len(entry.ToTesting)),
+		toStable:    make(map[string]string, len(entry.ToStable)),
+	}
+
+	for from, to := range entry.ToTesting {
+		if !contains(channels.stableTags, from) {
+			return imageChannels{}, fmt.Errorf("channel table entry %q: to_testing source %q is not in stable_tags", ref, from)
+		}
+		if !contains(channels.testingTags, to) {
+			return imageChannels{}, fmt.Errorf("channel table entry %q: to_testing target %q is not in testing_tags", ref, to)
+		}
+		channels.toTesting[from] = to
+	}
+
+	for from, to := range entry.ToStable {
+		if !contains(channels.testingTags, from) {
+			return imageChannels{}, fmt.Errorf("channel table entry %q: to_stable source %q is not in testing_tags", ref, from)
+		}
+		if !contains(channels.stableTags, to) {
+			return imageChannels{}, fmt.Errorf("channel table entry %q: to_stable target %q is not in stable_tags", ref, to)
+		}
+		channels.toStable[from] = to
+	}
+
+	for _, tag := range channels.testingTags {
+		if _, ok := channels.toStable[tag]; !ok {
+			return imageChannels{}, fmt.Errorf("channel table entry %q: testing tag %q has no to_stable mapping, so a host could not switch back", ref, tag)
+		}
+	}
+
+	return channels, nil
+}
+
+// LoadTable reads and applies the first existing channel-table file in
+// paths. It returns the path it applied, or "" when no candidate exists —
+// which is the ordinary case, and leaves the built-in table active. A
+// candidate that exists but is invalid is an error and leaves the previously
+// active table untouched: a broken override must not silently degrade into
+// "no images are switchable", nor into a partially applied mapping.
+func LoadTable(paths []string) (string, error) {
+	for _, path := range paths {
+		file, err := os.Open(path)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return "", fmt.Errorf("opening channel table %s: %w", path, err)
+		}
+
+		table, parseErr := ParseTable(file)
+		closeErr := file.Close()
+		if parseErr != nil {
+			return "", fmt.Errorf("%s: %w", path, parseErr)
+		}
+		if closeErr != nil {
+			return "", fmt.Errorf("closing channel table %s: %w", path, closeErr)
+		}
+
+		activeTable = table
+		return path, nil
+	}
+	return "", nil
+}
+
+// LoadSystemTable applies the channel-table override from the fixed system
+// paths. Both the GUI and the privileged helper call it at startup, so they
+// always resolve the same table — a helper that used the built-in table
+// while the GUI used an override would offer a switch and then refuse it.
+func LoadSystemTable() (string, error) {
+	return LoadTable(SystemTablePaths)
+}
+
+// ResetTable restores the built-in table. It exists for tests.
+func ResetTable() {
+	activeTable = builtinTable()
+}

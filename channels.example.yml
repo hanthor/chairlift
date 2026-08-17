@@ -1,0 +1,55 @@
+# ChairLift release-channel table
+#
+# Copy to /etc/chairlift/channels.yml (administrator) or ship at
+# /usr/share/chairlift/channels.yml (image maintainer). Those two paths, in
+# that order, are the only places ChairLift reads this file from — it is
+# never read from the working directory, because the privileged helper
+# resolves `bootc switch` targets through this same table and a
+# user-writable table would let any local user redirect an authenticated
+# system switch.
+#
+# ChairLift already knows the three Bluefin-family images:
+#
+#   ghcr.io/ublue-os/bluefin            lts <-> lts-testing, lts-hwe <-> lts-hwe-testing
+#                                       (latest/stable/gts/beta publish no
+#                                       testing tag, so those hosts show the
+#                                       switch as unavailable)
+#   ghcr.io/projectbluefin/bluefin-lts  lts, stable -> testing; testing -> stable
+#   ghcr.io/projectbluefin/dakota       latest, stable -> testing; testing -> stable
+#
+# Entries here are overlaid on those. A key that matches a built-in replaces
+# it outright, so an override can remove a mapping as well as add one; any
+# other key adds a new image.
+#
+# Every entry is validated before it is applied. A file that would produce a
+# reference ChairLift cannot switch back from, or that maps to a tag the
+# image does not declare, is rejected whole rather than partly applied.
+
+images:
+  # A TunaOS desktop image published with latest/stable/testing streams.
+  ghcr.io/tuna-os/tromso:
+    # Every non-testing stream tag this image publishes. Tags listed here
+    # but absent from to_testing are recognized for display and are simply
+    # not switchable.
+    stable_tags:
+      - latest
+      - stable
+    # Every testing stream tag this image publishes.
+    testing_tags:
+      - testing
+    # Which testing tag each stable tag moves to.
+    to_testing:
+      latest: testing
+      stable: testing
+    # Which stable tag each testing tag returns to. Required for every entry
+    # in testing_tags — a switch a host cannot undo is rejected.
+    to_stable:
+      testing: stable
+
+  ghcr.io/tuna-os/razorfin:
+    stable_tags: [latest]
+    testing_tags: [testing]
+    to_testing:
+      latest: testing
+    to_stable:
+      testing: latest

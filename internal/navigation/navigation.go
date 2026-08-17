@@ -78,6 +78,7 @@ var items = []Item{
 		Icon:       "software-update-available-symbolic",
 		ConfigPage: "updates_page",
 		Groups: []string{
+			"update_all_group",
 			"bootc_updates_group",
 			"sysupdate_updates_group",
 			"flatpak_updates_group",
@@ -101,7 +102,12 @@ var items = []Item{
 		Title:      "Features",
 		Icon:       "application-x-addon-symbolic",
 		ConfigPage: "features_page",
-		Groups:     []string{"features_group"},
+		Groups: []string{
+			"features_group",
+			"channel_group",
+			"dx_group",
+			"gaming_group",
+		},
 	},
 	{
 		Name:       "help",

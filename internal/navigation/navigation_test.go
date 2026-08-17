@@ -161,6 +161,7 @@ func TestPageMetadataCoversEveryBuilderBackedGroup(t *testing.T) {
 			"maintenance_optimization_group",
 		},
 		"updates": {
+			"update_all_group",
 			"bootc_updates_group",
 			"sysupdate_updates_group",
 			"flatpak_updates_group",
@@ -172,8 +173,13 @@ func TestPageMetadataCoversEveryBuilderBackedGroup(t *testing.T) {
 			"bootc_status_group",
 			"health_group",
 		},
-		"features": {"features_group"},
-		"help":     {"help_resources_group"},
+		"features": {
+			"features_group",
+			"channel_group",
+			"dx_group",
+			"gaming_group",
+		},
+		"help": {"help_resources_group"},
 	}
 
 	items := Items()
