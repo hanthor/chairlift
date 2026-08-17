@@ -130,6 +130,17 @@ An agent must not break these:
   boundary, because each would be a value an authenticated caller controls.
   `internal/ubluehelper`'s tests assert this per command, and the e2e boundary
   test asserts the installed binary rejects each shape.
+- **Every navigable page has a committed screenshot and a walkthrough entry.**
+  `make screenshots` regenerates `docs/screenshots/` from the real
+  application; `docs/walkthrough.md` is the user-facing tour built from them.
+  `internal/installcheck`'s walkthrough tests run in `make ci` and fail when a
+  page has no screenshot, when the document does not reference one, when a
+  screenshot is orphaned, when a capture byproduct is committed, or when a
+  named feature is undocumented. The check is deliberately referential rather
+  than a pixel comparison: font hinting and GTK point releases move pixels, so
+  regenerating and diffing per push would churn the repository for no signal.
+  Adding a page or a user-facing feature means running `make screenshots` and
+  extending `docs/walkthrough.md` in the same change.
 - **The `chairlift_e2e` stub surface is capped and centralized.** Two
   behaviors are stubbed so the screenshot walkthrough can render features a CI
   runner cannot have: the image descriptor (`CHAIRLIFT_IMAGE_INFO`) and the

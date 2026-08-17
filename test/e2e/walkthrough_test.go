@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -37,6 +38,46 @@ const (
 //
 // The whole run is in --dry-run, so none of the three Bluefin-family
 // toggles can execute a real mutation while the screenshots are taken.
+// windowGeometry is the captured window's position and size on the Xvfb
+// root, as recorded by capture_walkthrough.sh.
+type windowGeometry struct {
+	X, Y, Width, Height int
+}
+
+// readWindowGeometry parses the `xdotool getwindowgeometry --shell` output
+// the script wrote. A missing or unparseable file yields ok=false, and the
+// caller writes the uncropped frame rather than failing: the crop is a
+// presentation nicety for the docs, not an assertion.
+func readWindowGeometry(t *testing.T, outDir string) (windowGeometry, bool) {
+	t.Helper()
+
+	data, err := os.ReadFile(filepath.Join(outDir, "window-geometry.env"))
+	if err != nil {
+		t.Logf("no window geometry recorded, writing uncropped frames: %v", err)
+		return windowGeometry{}, false
+	}
+
+	fields := map[string]int{}
+	for _, line := range strings.Split(string(data), "\n") {
+		key, value, found := strings.Cut(strings.TrimSpace(line), "=")
+		if !found {
+			continue
+		}
+		number, err := strconv.Atoi(value)
+		if err != nil {
+			continue
+		}
+		fields[key] = number
+	}
+
+	geometry := windowGeometry{X: fields["X"], Y: fields["Y"], Width: fields["WIDTH"], Height: fields["HEIGHT"]}
+	if geometry.Width <= 0 || geometry.Height <= 0 {
+		t.Logf("window geometry %+v is unusable, writing uncropped frames", geometry)
+		return windowGeometry{}, false
+	}
+	return geometry, true
+}
+
 func TestWalkthroughScreenshots(t *testing.T) {
 	// The walkthrough drives the chairlift_e2e-tagged GUI, which `make e2e`
 	// builds into a subdirectory of its own. The other E2E tests use the
@@ -102,12 +143,21 @@ func TestWalkthroughScreenshots(t *testing.T) {
 	assertBluefinGroupsRendered(t, outDir)
 	assertUpdateAllRendered(t, outDir)
 
+	geometry, cropped := readWindowGeometry(t, outDir)
+
 	frames := make(map[string]string, len(names))
 	for index, name := range names {
 		path := filepath.Join(outDir, fmt.Sprintf("%d-%s.xwd", index+1, name))
 		t.Run(name, func(t *testing.T) {
+			// The assertions below run against the full root frame, so the
+			// fixed-size and variance checks stay meaningful; only the PNG
+			// written for human review is cropped to the window.
 			frame := decodeFrame(t, path)
-			writePNG(t, frame, strings.TrimSuffix(path, ".xwd")+".png")
+			png := frame
+			if cropped {
+				png = cropFrame(frame, geometry)
+			}
+			writePNG(t, png, strings.TrimSuffix(path, ".xwd")+".png")
 
 			bounds := frame.Bounds()
 			if bounds.Dx() != walkthroughWidth || bounds.Dy() != walkthroughHeight {
@@ -178,6 +228,30 @@ func decodeFrame(t *testing.T, path string) image.Image {
 	frame, err := decodeXWDFile(path)
 	if err != nil {
 		t.Fatalf("walkthrough capture %s: %v", filepath.Base(path), err)
+	}
+	return frame
+}
+
+// cropFrame returns the sub-image covering just the application window.
+// A geometry that does not fit inside the frame yields the frame unchanged,
+// since a wrong crop is worse than no crop.
+func cropFrame(frame image.Image, geometry windowGeometry) image.Image {
+	bounds := frame.Bounds()
+	window := image.Rect(
+		bounds.Min.X+geometry.X,
+		bounds.Min.Y+geometry.Y,
+		bounds.Min.X+geometry.X+geometry.Width,
+		bounds.Min.Y+geometry.Y+geometry.Height,
+	)
+	if !window.In(bounds) || window.Empty() {
+		return frame
+	}
+
+	type subImager interface {
+		SubImage(r image.Rectangle) image.Image
+	}
+	if sub, ok := frame.(subImager); ok {
+		return sub.SubImage(window)
 	}
 	return frame
 }

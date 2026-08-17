@@ -14,9 +14,12 @@ Two constraints shape every phase and are not negotiable per-item:
   changes, drill-down for detail — as identified by finupdate's own
   [HIG audit](https://github.com/tuna-os/finupdate/blob/main/docs/GNOME-HIG-AUDIT.md).
   A ported feature that arrives as six switches has not been ported correctly.
-- **Every phase is proven by automated checks.** `make ci` for logic,
-  `make e2e` for the installed boundary, and the screenshot walkthrough for
-  the rendered surface. Per
+- **Every phase is proven by automated checks, and documented visually.**
+  `make ci` for logic, `make e2e` for the installed boundary, and the
+  screenshot walkthrough for the rendered surface. Each phase must also add
+  its feature to [docs/walkthrough.md](../walkthrough.md) with a screenshot
+  from `make screenshots`; `make ci` fails when a page or named feature is
+  missing from it. Per
   [acceptance-criteria-need-automated-checks-not-inspection](../agents/skills/acceptance-criteria-need-automated-checks-not-inspection.md),
   "verified by inspection" does not close a phase.
 

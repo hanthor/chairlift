@@ -93,6 +93,31 @@ build-e2e: build
 	@mkdir -p $(E2E_BUILD_DIR)
 	CGO_ENABLED=$(CGO_ENABLED) $(GOBUILD) -tags $(E2E_TAGS) -o $(E2E_BUILD_DIR)/$(BINARY_NAME) ./cmd/chairlift
 
+# Regenerate the documentation walkthrough screenshots in docs/screenshots/
+# from the real application, then remove the capture byproducts so only the
+# PNGs are left to commit.
+#
+# It cannot join `make ci`: it needs a display, GTK, and the X utilities. It
+# is also deliberately not run per-push — font hinting and GTK point releases
+# move pixels, so regenerating on every commit would churn the repository for
+# no signal. Run it when a feature's appearance actually changes.
+#
+# The referential check that every page has a screenshot and every screenshot
+# is referenced by docs/walkthrough.md is a pure-Go test in
+# internal/installcheck, so that half does run in `make ci`.
+.PHONY: screenshots
+screenshots: build-e2e
+	@mkdir -p $(SCREENSHOT_DIR)
+	CHAIRLIFT_E2E_BUILD_DIR=$(abspath $(BUILD_DIR)) \
+		CHAIRLIFT_WALKTHROUGH_DIR=$(abspath $(SCREENSHOT_DIR)) \
+		$(GOTEST) -count=1 -run TestWalkthroughScreenshots ./test/e2e
+	@rm -rf $(SCREENSHOT_DIR)/home $(SCREENSHOT_DIR)/*.xwd \
+		$(SCREENSHOT_DIR)/chairlift.log $(SCREENSHOT_DIR)/window-geometry.env \
+		$(SCREENSHOT_DIR)/image-info.json
+	@echo "==> screenshots written to $(SCREENSHOT_DIR)"
+
+SCREENSHOT_DIR=docs/screenshots
+
 # End-to-end smoke tests require GTK4, Libadwaita, dbus-run-session, and Xvfb;
 # the screenshot walkthrough additionally requires Xvfb, xdotool, xdpyinfo,
 # and xwd. They run separately from ci because the ordinary unit-test gate is

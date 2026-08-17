@@ -97,6 +97,7 @@ export CHAIRLIFT_IMAGE_INFO
 : "${CHAIRLIFT_AUTO_UPDATES:=enabled,active}"
 export CHAIRLIFT_AUTO_UPDATES
 
+
 dbus-run-session -- "$APP" --dry-run >>"$LOG" 2>&1 &
 APP_PID=$!
 
@@ -127,6 +128,12 @@ sleep 2
 WINDOW="$(xdotool search --sync --onlyvisible --name . | head -n 1 || true)"
 [ -n "$WINDOW" ] || { echo "no visible ChairLift window found on $DISPLAY" >&2; exit 1; }
 xdotool windowactivate --sync "$WINDOW" 2>/dev/null || true
+
+# Record the window's geometry so the Go side can crop the captured root
+# image down to just the application. Reading it from the running window
+# rather than hardcoding it keeps the crop correct if the default window size
+# ever changes.
+xdotool getwindowgeometry --shell "$WINDOW" > "$OUTDIR/window-geometry.env"
 
 index=0
 for page in "${PAGES[@]}"; do
