@@ -1162,6 +1162,27 @@ fixed argv that takes no delay and no target. Scheduled restarts
 need their own action rather than a parameter here, precisely because a time
 argument crossing the boundary is another value the caller would control.
 
+### Action journal and desktop notifications
+
+`internal/journal` is a port of finupdate's `action_journal.rs`: one JSON
+line per privileged action, appended when `$CHAIRLIFT_ACTION_JOURNAL` is set,
+a no-op otherwise. It is wired into the single dispatch point both privileged
+helpers already share — `internal/ublue.runHelper` and
+`internal/updex.runHelper` — so it is a genuine choke point, not a call added
+at each of the eleven call sites that reach it. A dry-run invocation is
+recorded with `Suppressed: SuppressedDryRun` and the argv that would have run,
+which is what lets a test assert intent ("clicking Switch would have run
+`bootc switch ghcr.io/…/dakota:testing`") without granting privilege; see
+`internal/ublue`'s `TestRunHelperJournalsEveryInvocation`.
+
+`internal/notify` sends exactly one desktop `GNotification`: Update All's
+completion, through `views.ToastAdder.NotifyBackground` (implemented by
+`internal/window.Window`, the one place holding a `*gtk.Application` handle).
+It is the only ChairLift action long enough that a user plausibly stepped
+away before it finished; every other toggle completes in view and already has
+a toast, so a second notification there would be noise the simple-interface
+constraint rules out.
+
 ### Automatic background updates
 
 `internal/autoupdate` classifies the state of `uupd.timer`, the unit

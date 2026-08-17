@@ -2,6 +2,7 @@ package ublue
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/frostyard/chairlift/internal/gpu"
 	"github.com/frostyard/chairlift/internal/imageinfo"
+	"github.com/frostyard/chairlift/internal/journal"
 	"github.com/frostyard/chairlift/internal/ubluehelper"
 )
 
@@ -454,4 +456,90 @@ func TestSwitchDriverRejectsUnpublishedDrivers(t *testing.T) {
 			t.Errorf("SwitchDriver(%q) error = nil, want a refusal before pkexec is reached", driver)
 		}
 	}
+}
+
+// This is the assertion the journal exists to make possible: prove that
+// clicking a switch would have run a specific, real argv — without granting
+// privilege, and without inspecting fake-pkexec's captured file (that proves
+// pkexec was invoked correctly; this proves ChairLift's own record of intent
+// matches).
+func TestRunHelperJournalsEveryInvocation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal.jsonl")
+	t.Setenv(journal.PathEnv, path)
+	journal.Reset()
+	t.Cleanup(journal.Reset)
+
+	captured := filepath.Join(t.TempDir(), "captured-args")
+	pkexec := writeFakePkexec(t, captured)
+
+	if _, _, err := runHelper(context.Background(), pkexec, ubluehelper.CommandChannelSwitch, "testing"); err != nil {
+		t.Fatalf("runHelper() error = %v, want nil", err)
+	}
+
+	entries := readJournal(t, path)
+	if len(entries) != 1 {
+		t.Fatalf("journal has %d entries, want 1", len(entries))
+	}
+	entry := entries[0]
+	if entry.Action != ubluehelper.CommandChannelSwitch {
+		t.Errorf("journalled action = %q, want %q", entry.Action, ubluehelper.CommandChannelSwitch)
+	}
+	if entry.Suppressed != journal.SuppressedNone {
+		t.Errorf("journalled suppressed = %q, want %q (a live run)", entry.Suppressed, journal.SuppressedNone)
+	}
+	wantArgv := []string{pkexec, HelperPath, ubluehelper.CommandChannelSwitch, "testing"}
+	if !reflect.DeepEqual(entry.WouldRun, wantArgv) {
+		t.Errorf("journalled WouldRun = %v, want %v", entry.WouldRun, wantArgv)
+	}
+}
+
+// Under dry-run the journal must record the --dry-run flag was appended and
+// mark the entry suppressed, so a reader of the journal alone — without the
+// application log — can tell nothing actually happened.
+func TestRunHelperJournalsDryRunAsSuppressed(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "journal.jsonl")
+	t.Setenv(journal.PathEnv, path)
+	journal.Reset()
+	t.Cleanup(journal.Reset)
+
+	SetDryRun(true)
+	t.Cleanup(func() { SetDryRun(false) })
+
+	if _, _, err := runHelper(context.Background(), "pkexec-should-never-run", ubluehelper.CommandDXEnable); err != nil {
+		t.Fatalf("runHelper() error = %v, want nil", err)
+	}
+
+	entries := readJournal(t, path)
+	if len(entries) != 1 {
+		t.Fatalf("journal has %d entries, want 1", len(entries))
+	}
+	entry := entries[0]
+	if entry.Suppressed != journal.SuppressedDryRun {
+		t.Errorf("journalled suppressed = %q, want %q", entry.Suppressed, journal.SuppressedDryRun)
+	}
+	if entry.WouldRun[len(entry.WouldRun)-1] != "--dry-run" {
+		t.Errorf("journalled WouldRun = %v, want it to end in --dry-run", entry.WouldRun)
+	}
+}
+
+func readJournal(t *testing.T, path string) []journal.Entry {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("reading journal %s: %v", path, err)
+	}
+
+	var entries []journal.Entry
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		if line == "" {
+			continue
+		}
+		var entry journal.Entry
+		if err := json.Unmarshal([]byte(line), &entry); err != nil {
+			t.Fatalf("decoding journal line %q: %v", line, err)
+		}
+		entries = append(entries, entry)
+	}
+	return entries
 }

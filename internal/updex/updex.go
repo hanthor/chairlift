@@ -9,9 +9,11 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/frostyard/chairlift/internal/journal"
 	"github.com/frostyard/chairlift/internal/updexhelper"
 	updexapi "github.com/frostyard/updex/updex"
 )
@@ -147,6 +149,15 @@ func UpdateFeatures(ctx context.Context) error {
 	return err
 }
 
+// journalArgs turns a privileged helper's argv (minus the leading command
+// word, which becomes journal.Entry.Action) into the journal's args map.
+func journalArgs(args []string) map[string]string {
+	if len(args) <= 1 {
+		return nil
+	}
+	return map[string]string{"args": strings.Join(args[1:], " ")}
+}
+
 // runHelper executes HelperPath via pkexec for privileged operations. pkexecPath
 // is the pkexec binary to invoke — always pkexecCommand in production, but an
 // explicit parameter (mirroring internal/stageexec.Run's executable seam) so
@@ -154,15 +165,25 @@ func UpdateFeatures(ctx context.Context) error {
 // pkexec/polkit stack or requiring root. HelperPath itself is never overridden: it is the fixed
 // absolute path that must match the policy's exec.path annotation, so tests
 // assert it by inspecting the fake pkexec's captured argv rather than by
-// substituting a different one in.
+// substituting a different one in. Every invocation — dry-run or live — is
+// also journal.Record'd, so a test can assert the argv ChairLift assembled
+// without granting privilege; see internal/journal.
 func runHelper(ctx context.Context, pkexecPath string, args ...string) (string, string, error) {
+	action := ""
+	if len(args) > 0 {
+		action = args[0]
+	}
+
 	if dryRun {
 		args = append(args, "--dry-run")
+		wouldRun := append([]string{pkexecPath, HelperPath}, args...)
+		journal.Record(action, journalArgs(args), wouldRun, journal.SuppressedDryRun)
 		log.Printf("[DRY-RUN] would execute: %s %s %v", pkexecPath, HelperPath, args)
 		return "", "", nil
 	}
 
 	fullArgs := append([]string{HelperPath}, args...)
+	journal.Record(action, journalArgs(args), append([]string{pkexecPath}, fullArgs...), journal.SuppressedNone)
 	cmd := exec.CommandContext(ctx, pkexecPath, fullArgs...)
 
 	var stdout, stderr bytes.Buffer

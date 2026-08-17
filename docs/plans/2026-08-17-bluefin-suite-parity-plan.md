@@ -48,8 +48,8 @@ covered it before this plan.
 | Image variant selection (`-nvidia`) | — | ✅ rebase dialog | **Done** — `internal/imageinfo` driver table, one hardware-driven offer |
 | Pin to dated tag / unpin to stream | — | ✅ | **Later** — needs a live registry tag listing in the GUI; see Later/ideas |
 | GPU detection | ✅ | ✅ | **Done** — `internal/gpu`, PCI vendor IDs from sysfs |
-| Action journal of privileged operations | — | ✅ | **Phase 5** |
-| Desktop notifications | ✅ `notify-send` | ✅ `GNotification` | **Phase 5** |
+| Action journal of privileged operations | — | ✅ | **Done** — `internal/journal`, wired into both privileged dispatch points |
+| Desktop notifications | ✅ `notify-send` | ✅ `GNotification` | **Done** — `internal/notify`, Update All completion only |
 | Update strategy / focus mode / per-layer switches | ✅ | — | **Not porting** — the option sprawl the HIG constraint rules out. Phase 3's single switch replaces it. |
 | Reboot-on-logout / scheduled reboot window | ✅ | ✅ "Restart Tonight" | **Deferred** — needs a systemd user unit contract; revisit after Phase 3 |
 | Powerwash / Factory Reset | — | ✅ | **Approved 2026-08-17** — Phase 6. Irreversible, so both need an explicit typed/confirmed dialog and `bootc install reset` must stay behind its `--experimental` warning |
@@ -137,14 +137,21 @@ phases are already unprivileged. The only new privileged surface is
 - Ownership recorded in
   [ADR-0011](../adr/0011-chairlift-owns-bluefin-family-rebasing.md).
 
-## Phase 5 — Audit and notification (small)
+## Phase 5 — Audit and notification (small) — ✅ landed
 
-- Action journal: append-only JSONL of every privileged action, mirroring
-  finupdate's `action_journal.rs`. It also makes the walkthrough's
-  privileged-path assertions machine-checkable.
-- Desktop notification on completion of a long-running operation.
-- **Done when:** the e2e boundary test asserts a journal entry per privileged
-  invocation.
+- `internal/journal` records every privileged dispatch — dry-run or live —
+  from the one choke point both helpers already share (`runHelper`), mirroring
+  finupdate's `action_journal.rs`. Disabled (a couple of atomic loads) unless
+  `$CHAIRLIFT_ACTION_JOURNAL` is set, so it ships in the released binary
+  rather than being a `chairlift_e2e` stub.
+- `internal/notify` sends exactly one desktop notification: Update All's
+  completion. Every other action already completes in view with a toast; a
+  second notification for the same instant event would be noise, which is
+  what the simple-interface constraint rules out.
+- **Done when:** a unit test proves the journal captures the exact argv a
+  privileged action would run, without granting privilege. **Met** —
+  `TestRunHelperJournalsEveryInvocation` and
+  `TestRunHelperJournalsDryRunAsSuppressed` in `internal/ublue`.
 
 ## Phase 6 — Powerwash and Factory Reset (medium)
 

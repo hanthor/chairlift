@@ -25,6 +25,13 @@ var (
 	windowRegistry *gobj.InstanceRegistry
 )
 
+// notificationID identifies ChairLift's one notification stream. Reusing a
+// fixed ID (rather than a random one per send) means a later background run
+// replaces the desktop's still-visible notification from an earlier one
+// instead of stacking a second, matching how a single Updates row already
+// represents "the current state," not a log of past runs.
+const notificationID = "org.frostyard.ChairLift.background-task"
+
 // Window represents the main application window
 type Window struct {
 	adw.ApplicationWindow
@@ -442,6 +449,30 @@ func (w *Window) ShowErrorToast(message string) {
 	toast := adw.NewToast(message)
 	toast.SetTimeout(0) // Persist until dismissed
 	w.AddToast(toast)
+}
+
+// NotifyBackground sends a desktop GNotification, for background work long
+// enough that a user plausibly stepped away before it finished. See
+// internal/notify for what gets sent and why it is deliberately rare.
+//
+// It requires the window to be attached to a *gtk.Application, which is
+// always true once the window is shown — GetApplication returns nil only
+// before that, so a nil result is silently skipped rather than treated as an
+// error worth surfacing: a missed notification is not worth interrupting the
+// operation whose result it was reporting.
+func (w *Window) NotifyBackground(title, body string, urgent bool) {
+	application := w.GetApplication()
+	if application == nil {
+		log.Printf("NotifyBackground: no application attached yet, dropping %q", title)
+		return
+	}
+
+	notification := gio.NewNotification(title)
+	notification.SetBody(body)
+	if urgent {
+		notification.SetPriority(gio.GNotificationPriorityHighValue)
+	}
+	application.SendNotification(notificationID, notification)
 }
 
 // SetUpdateBadge updates the badge on the Updates navigation row

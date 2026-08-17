@@ -21,6 +21,11 @@ type ToastAdder interface {
 	ShowToast(message string)
 	ShowErrorToast(message string)
 	SetUpdateBadge(count int)
+	// NotifyBackground sends a desktop notification, for the one operation
+	// (Update All) long enough that the user might not be watching. See
+	// internal/notify for what gets sent and why it is only that one
+	// operation.
+	NotifyBackground(title, body string, urgent bool)
 }
 
 // UserHome manages all content pages

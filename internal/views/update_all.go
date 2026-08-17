@@ -11,6 +11,7 @@ import (
 	"github.com/frostyard/chairlift/internal/bootc"
 	"github.com/frostyard/chairlift/internal/flatpak"
 	"github.com/frostyard/chairlift/internal/homebrew"
+	"github.com/frostyard/chairlift/internal/notify"
 	"github.com/frostyard/chairlift/internal/ublue"
 	"github.com/frostyard/chairlift/internal/updateall"
 	"github.com/frostyard/chairlift/internal/views/actionmsg"
@@ -304,6 +305,9 @@ func (uh *UserHome) finishUpdateAll(results []updateall.Result) {
 			uh.updateAllRestart.SetSubtitle(presentation.Subtitle)
 			uh.updateAllRestart.SetVisible(true)
 		}
+
+		notification := notify.UpdateAllComplete(summary.Succeeded, summary.Failed, summary.Skipped, summary.RestartRequired)
+		uh.toastAdder.NotifyBackground(notification.Title, notification.Body, notification.Urgency == notify.UrgencyHigh)
 
 		if summary.Failed > 0 {
 			uh.toastAdder.ShowErrorToast(summary.Headline)
