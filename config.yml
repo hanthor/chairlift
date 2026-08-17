@@ -15,6 +15,14 @@ system_page:
 updates_page:
   # Update All leads the page; the per-provider groups below it remain
   # available for anything it does not cover.
+  #
+  # The Automatic Updates switch is rendered inside this group, because it
+  # answers the same question — how does this system get updated — and
+  # splitting it out would present two unrelated-looking settings. Disabling
+  # this group therefore hides that switch too. There is deliberately no
+  # separate key for it: an independent key could be enabled while this one
+  # was disabled, which would leave the Updates page claiming a group it does
+  # not draw.
   update_all_group:
     enabled: true
   bootc_updates_group:

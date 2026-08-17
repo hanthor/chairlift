@@ -93,7 +93,9 @@ func (uh *UserHome) buildUpdateAllGroup(page *adw.PreferencesPage) {
 
 	// Automatic updates sit with Update All rather than in a group of their
 	// own: they answer the same question — how does this system get updated
-	// — and separating them would imply they are unrelated settings.
+	// — and separating them would imply they are unrelated settings. They
+	// share update_all_group's config key for the same reason; see
+	// config.yml.
 	uh.buildAutomaticUpdatesRow(group)
 
 	page.Add(group)
@@ -283,7 +285,6 @@ func (uh *UserHome) applyUpdateAllEvent(event updateall.Event) {
 // prompt when an image was actually staged.
 func (uh *UserHome) finishUpdateAll(results []updateall.Result) {
 	summary := updateall.Summarize(results)
-	stagedVersion := stagedVersionFrom(results)
 
 	log.Printf("views: update all finished succeeded=%d failed=%d skipped=%d restart_required=%v",
 		summary.Succeeded, summary.Failed, summary.Skipped, summary.RestartRequired)
@@ -299,7 +300,7 @@ func (uh *UserHome) finishUpdateAll(results []updateall.Result) {
 			uh.updateAllRow.SetSubtitle(summary.Headline)
 		}
 		if uh.updateAllRestart != nil && summary.RestartRequired {
-			presentation := pageview.RestartRow(stagedVersion)
+			presentation := pageview.RestartRow(summary.StagedVersion)
 			uh.updateAllRestart.SetSubtitle(presentation.Subtitle)
 			uh.updateAllRestart.SetVisible(true)
 		}
@@ -310,23 +311,6 @@ func (uh *UserHome) finishUpdateAll(results []updateall.Result) {
 		}
 		uh.toastAdder.ShowToast(summary.Headline)
 	})
-}
-
-// stagedVersionFrom extracts the staged version the OS phase reported, for
-// the restart row. The detail string is the phase's own presentation, so the
-// version is recovered rather than re-queried.
-func stagedVersionFrom(results []updateall.Result) string {
-	for _, result := range results {
-		if result.Phase.ID != updateall.PhaseOS {
-			continue
-		}
-		var version string
-		if _, err := fmt.Sscanf(result.Detail, "Update %s staged", &version); err == nil {
-			return version
-		}
-		return ""
-	}
-	return ""
 }
 
 // onRestartClicked restarts the machine. The button is disabled immediately:

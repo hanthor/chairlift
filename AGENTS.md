@@ -130,6 +130,20 @@ An agent must not break these:
   boundary, because each would be a value an authenticated caller controls.
   `internal/ubluehelper`'s tests assert this per command, and the e2e boundary
   test asserts the installed binary rejects each shape.
+- **The `chairlift_e2e` stub surface is capped and centralized.** Two
+  behaviors are stubbed so the screenshot walkthrough can render features a CI
+  runner cannot have: the image descriptor (`CHAIRLIFT_IMAGE_INFO`) and the
+  unattended-update timer state (`CHAIRLIFT_AUTO_UPDATES`). Every stub must be
+  read in `internal/app/imageinfo_override_e2e.go` and nowhere else, behind
+  the `chairlift_e2e` tag that only `make e2e` sets, with a no-op counterpart
+  in `imageinfo_override.go`.
+  `internal/installcheck.TestDescriptorOverrideStaysBehindTheE2EBuildTag`
+  enforces both halves and must gain each new variable's name. Adding a stub
+  means adding it to that one file and that one test — never a second tagged
+  file, and never an untagged read. A stub may only affect a read-only,
+  display-side classification: anything a privileged helper consults must
+  keep resolving its own source of truth, because the helper is built without
+  the tag.
 - **OS staging execution has one owner.** `internal/stageexec` is the pure-Go
   leaf package that owns the progress event contract, merged stdout/stderr
   streaming, direct-child cancellation, error classification, completion event,

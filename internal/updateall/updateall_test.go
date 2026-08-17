@@ -244,10 +244,13 @@ func TestOSPhaseDistinguishesStagedFromAlreadyCurrent(t *testing.T) {
 		version     string
 		wantDetail  string
 		wantRestart bool
+		wantVersion string
 	}{
-		{name: "staged with a version", staged: true, version: "42.20260817", wantDetail: "Update 42.20260817 staged", wantRestart: true},
+		{name: "staged with a version", staged: true, version: "42.20260817", wantDetail: "Update 42.20260817 staged", wantRestart: true, wantVersion: "42.20260817"},
 		{name: "staged without a version", staged: true, wantDetail: "Update staged", wantRestart: true},
-		{name: "already current", staged: false, wantDetail: "Already up to date", wantRestart: false},
+		// A version reported for an unstaged system must not leak into the
+		// restart row, because there is no restart to prompt for.
+		{name: "already current", staged: false, version: "42.20260817", wantDetail: "Already up to date", wantRestart: false},
 	}
 
 	for _, test := range tests {
@@ -262,8 +265,21 @@ func TestOSPhaseDistinguishesStagedFromAlreadyCurrent(t *testing.T) {
 			if !strings.Contains(results[0].Detail, test.wantDetail) {
 				t.Errorf("OS detail = %q, want it to contain %q", results[0].Detail, test.wantDetail)
 			}
-			if got := Summarize(results).RestartRequired; got != test.wantRestart {
-				t.Errorf("RestartRequired = %v, want %v", got, test.wantRestart)
+			summary := Summarize(results)
+			if summary.RestartRequired != test.wantRestart {
+				t.Errorf("RestartRequired = %v, want %v", summary.RestartRequired, test.wantRestart)
+			}
+
+			// The version travels as data, so the restart row cannot be
+			// broken by rewording the detail string.
+			if results[0].StagedVersion != test.wantVersion {
+				t.Errorf("Result.StagedVersion = %q, want %q", results[0].StagedVersion, test.wantVersion)
+			}
+			if summary.StagedVersion != test.wantVersion {
+				t.Errorf("Summary.StagedVersion = %q, want %q", summary.StagedVersion, test.wantVersion)
+			}
+			if got := results[0].Staged(); got != test.wantRestart {
+				t.Errorf("Result.Staged() = %v, want %v", got, test.wantRestart)
 			}
 		})
 	}
@@ -415,5 +431,32 @@ func TestRunDoesNotBlockOnAnUndrainedEventChannel(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("Run() blocked on an event channel with no receiver")
+	}
+}
+
+// Staged() is the single predicate for "an image really was staged"; a
+// successful OS phase alone is not sufficient, and no other phase qualifies.
+func TestResultStagedIsOSPhaseAndSuccessAndStaged(t *testing.T) {
+	os := Phase{ID: PhaseOS, Title: "System Image"}
+	brew := Phase{ID: PhaseBrew, Title: "Homebrew Packages"}
+
+	tests := []struct {
+		name   string
+		result Result
+		want   bool
+	}{
+		{name: "staged os phase", result: Result{Phase: os, Outcome: OutcomeSucceeded, Detail: "Update 42 staged — restart to apply"}, want: true},
+		{name: "os phase already current", result: Result{Phase: os, Outcome: OutcomeSucceeded, Detail: "Already up to date"}},
+		{name: "failed os phase", result: Result{Phase: os, Outcome: OutcomeFailed, Detail: "staged nothing"}},
+		{name: "skipped os phase", result: Result{Phase: os, Outcome: OutcomeSkipped, Detail: "Cancelled"}},
+		{name: "another phase mentioning staged", result: Result{Phase: brew, Outcome: OutcomeSucceeded, Detail: "staged"}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.result.Staged(); got != test.want {
+				t.Errorf("Staged() = %v, want %v", got, test.want)
+			}
+		})
 	}
 }

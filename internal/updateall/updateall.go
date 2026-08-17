@@ -114,6 +114,12 @@ type Result struct {
 	Phase   Phase
 	Outcome Outcome
 	Detail  string
+	// StagedVersion is the version the OS phase staged, when it staged one.
+	// It is carried as data rather than recovered from Detail: Detail is
+	// presentation, and a caller parsing it back would silently lose the
+	// version the moment the wording changed. Empty for every other phase,
+	// and for an OS phase that staged nothing.
+	StagedVersion string
 }
 
 // EventType classifies a progress event emitted during a run.
@@ -206,7 +212,11 @@ func (r Runner) runPhase(ctx context.Context, phase Phase, events chan<- Event) 
 		if r.StagedAfter != nil {
 			staged, version = r.StagedAfter(ctx)
 		}
-		return Result{Phase: phase, Outcome: OutcomeSucceeded, Detail: stagedDetail(staged, version)}
+		result := Result{Phase: phase, Outcome: OutcomeSucceeded, Detail: stagedDetail(staged, version)}
+		if staged {
+			result.StagedVersion = version
+		}
+		return result
 
 	case PhaseFlatpak:
 		if r.UpdateFlatpak == nil {
@@ -229,6 +239,15 @@ func (r Runner) runPhase(ctx context.Context, phase Phase, events chan<- Event) 
 	default:
 		return failed(phase, fmt.Sprintf("unknown phase %q", phase.ID))
 	}
+}
+
+// Staged reports whether this result represents a genuinely staged OS image.
+// A successful OS phase is not sufficient on its own — the stage script is
+// idempotent and exits 0 on an already-current system.
+func (r Result) Staged() bool {
+	return r.Phase.ID == PhaseOS &&
+		r.Outcome == OutcomeSucceeded &&
+		strings.Contains(r.Detail, "staged")
 }
 
 func failed(phase Phase, detail string) Result {
@@ -275,6 +294,10 @@ type Summary struct {
 	// FailedPhases names the phases that failed, in execution order, so the
 	// UI can point at them without re-deriving the order.
 	FailedPhases []string
+	// StagedVersion is the version the OS phase staged, when RestartRequired
+	// is true. It may be empty even then: bootc does not always report a
+	// version for a staged deployment.
+	StagedVersion string
 }
 
 // Summarize aggregates a run's results. It is separate from Run so that the
@@ -295,10 +318,9 @@ func Summarize(results []Result) Summary {
 		}
 
 		// Only a genuinely staged OS image justifies asking for a restart.
-		if result.Phase.ID == PhaseOS &&
-			result.Outcome == OutcomeSucceeded &&
-			strings.Contains(result.Detail, "staged") {
+		if result.Phase.ID == PhaseOS && result.Outcome == OutcomeSucceeded && result.Staged() {
 			summary.RestartRequired = true
+			summary.StagedVersion = result.StagedVersion
 		}
 	}
 

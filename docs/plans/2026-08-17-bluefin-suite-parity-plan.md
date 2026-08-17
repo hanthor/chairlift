@@ -105,6 +105,10 @@ phases are already unprivileged. The only new privileged surface is
   `disable` through a new helper subcommand + action.
 - Hidden entirely when `uupd` is absent, the same availability pattern as
   `updex` and the Bluefin-family groups.
+- Rendered inside `update_all_group` and sharing its config key, so disabling
+  that group hides the switch too. A separate key could be enabled while
+  `update_all_group` was disabled, leaving the page claiming a group it does
+  not draw.
 - **Done when:** the walkthrough captures the switch reflecting real timer
   state, and the switch is absent on a host without `uupd`. **Met.** The
   runner has no `uupd.timer`, so the walkthrough exercises both: unstubbed it
