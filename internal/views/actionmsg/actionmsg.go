@@ -480,3 +480,20 @@ func AutomaticUpdates(dryRun bool, enable bool) FeatureToggleDecision {
 		Toast:   fmt.Sprintf("Automatic updates turned %s.", verb),
 	}
 }
+
+// DriverSwitch decides whether the graphics-driver row should adopt its
+// switched subtitle, and what toast to show. Confirm is exactly !dryRun, for
+// the same reason as ChannelSwitch: under dry-run ublue.runHelper
+// short-circuits before pkexec, so no image was staged.
+func DriverSwitch(dryRun bool, driver string) FeatureToggleDecision {
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("[DRY-RUN] Preview: would switch to the %s image — no changes made", driver),
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   fmt.Sprintf("Switched to the %s image. Restart to apply.", driver),
+	}
+}

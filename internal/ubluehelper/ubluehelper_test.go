@@ -85,6 +85,21 @@ func TestParseInvocationAcceptsSupportedShapes(t *testing.T) {
 			args: []string{"auto-updates-enable", "--dry-run"},
 			want: Invocation{Command: CommandAutoEnable, DryRun: true},
 		},
+		{
+			name: "driver switch to nvidia",
+			args: []string{"driver-switch", "nvidia"},
+			want: Invocation{Command: CommandDriverSwitch, Driver: imageinfo.DriverNVIDIA},
+		},
+		{
+			name: "driver switch to open modules",
+			args: []string{"driver-switch", "nvidia-open"},
+			want: Invocation{Command: CommandDriverSwitch, Driver: imageinfo.DriverNVIDIAOpen},
+		},
+		{
+			name: "driver switch back to standard",
+			args: []string{"driver-switch", "standard", "--dry-run"},
+			want: Invocation{Command: CommandDriverSwitch, Driver: imageinfo.DriverStandard, DryRun: true},
+		},
 	}
 
 	for _, test := range tests {
@@ -136,6 +151,14 @@ func TestParseInvocationRejectsEveryUnsupportedShape(t *testing.T) {
 		// mask any systemd unit on the machine.
 		{name: "auto updates with a unit name", args: []string{"auto-updates-enable", "sshd.service"}},
 		{name: "auto updates with a flag", args: []string{"auto-updates-disable", "--now"}},
+		// An arbitrary suffix would name any image in the registry
+		// namespace, which is what keeping the reference out of argv
+		// prevents.
+		{name: "driver switch without a driver", args: []string{"driver-switch"}},
+		{name: "driver switch with an unknown driver", args: []string{"driver-switch", "nouveau"}},
+		{name: "driver switch with an image ref", args: []string{"driver-switch", "ghcr.io/evil/image:latest"}},
+		{name: "driver switch with a suffix", args: []string{"driver-switch", "asus"}},
+		{name: "driver switch with extra argument", args: []string{"driver-switch", "nvidia", "--dry-run", "now"}},
 		{name: "updex command is not accepted here", args: []string{"enable-feature", "demo"}},
 	}
 
@@ -162,6 +185,7 @@ func TestSupportedCommandsMatchesParser(t *testing.T) {
 		CommandRollback,
 		CommandAutoEnable,
 		CommandAutoDisable,
+		CommandDriverSwitch,
 	}
 	if !reflect.DeepEqual(commands, want) {
 		t.Fatalf("SupportedCommands() = %v, want %v", commands, want)
@@ -171,8 +195,11 @@ func TestSupportedCommandsMatchesParser(t *testing.T) {
 	// policy authorizes and the helper then rejects.
 	for _, command := range commands {
 		args := []string{command}
-		if command == CommandChannelSwitch {
+		switch command {
+		case CommandChannelSwitch:
 			args = append(args, ChannelTesting)
+		case CommandDriverSwitch:
+			args = append(args, string(imageinfo.DriverNVIDIA))
 		}
 		if _, err := ParseInvocation(args); err != nil {
 			t.Errorf("ParseInvocation(%v) error = %v, want nil for advertised command", args, err)
@@ -183,6 +210,79 @@ func TestSupportedCommandsMatchesParser(t *testing.T) {
 	commands[0] = "mutated"
 	if SupportedCommands()[0] != CommandChannelSwitch {
 		t.Error("SupportedCommands() returned an aliased slice")
+	}
+}
+
+func TestDriverSwitchArgsBuildPublishedReferencesOnly(t *testing.T) {
+	tests := []struct {
+		name   string
+		info   imageinfo.Info
+		driver imageinfo.Driver
+		want   []string
+		wantOK bool
+	}{
+		{
+			name:   "dakota to nvidia",
+			info:   imageinfo.Info{Name: "dakota", Tag: "latest", Ref: "docker://ghcr.io/projectbluefin/dakota"},
+			driver: imageinfo.DriverNVIDIA,
+			want:   []string{"switch", "--enforce-container-sigpolicy", "ghcr.io/projectbluefin/dakota-nvidia:latest"},
+			wantOK: true,
+		},
+		{
+			name:   "bluefin back to standard",
+			info:   imageinfo.Info{Name: "bluefin", Tag: "stable", Ref: "docker://ghcr.io/ublue-os/bluefin-nvidia"},
+			driver: imageinfo.DriverStandard,
+			want:   []string{"switch", "--enforce-container-sigpolicy", "ghcr.io/ublue-os/bluefin:stable"},
+			wantOK: true,
+		},
+		{
+			// The reference that must never be produced: the driver images
+			// are not published for the LTS streams.
+			name:   "lts cannot reach nvidia",
+			info:   imageinfo.Info{Name: "bluefin", Tag: "lts", Ref: "docker://ghcr.io/ublue-os/bluefin"},
+			driver: imageinfo.DriverNVIDIA,
+			wantOK: false,
+		},
+		{
+			name:   "unknown image",
+			info:   imageinfo.Info{Name: "custom", Tag: "latest", Ref: "docker://ghcr.io/someone/custom"},
+			driver: imageinfo.DriverNVIDIA,
+			wantOK: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, ok := DriverSwitchArgs(test.info, test.driver)
+			if ok != test.wantOK {
+				t.Fatalf("DriverSwitchArgs() ok = %v, want %v", ok, test.wantOK)
+			}
+			if !ok {
+				if got != nil {
+					t.Errorf("DriverSwitchArgs() = %v on refusal, want nil", got)
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Errorf("DriverSwitchArgs() = %v, want %v", got, test.want)
+			}
+			if !containsArg(got, "--enforce-container-sigpolicy") {
+				t.Error("a driver switch changes the booted image and must enforce the signature policy")
+			}
+		})
+	}
+}
+
+func TestParseDriverAcceptsOnlyPublishedFlavours(t *testing.T) {
+	for _, word := range []string{"standard", "nvidia", "nvidia-open"} {
+		if _, ok := parseDriver(word); !ok {
+			t.Errorf("parseDriver(%q) ok = false, want true", word)
+		}
+	}
+	for _, word := range []string{"", "asus", "surface", "dx", "nouveau", "NVIDIA", "ghcr.io/x/y"} {
+		if driver, ok := parseDriver(word); ok {
+			t.Errorf("parseDriver(%q) = (%q, true), want a refusal", word, driver)
+		}
 	}
 }
 

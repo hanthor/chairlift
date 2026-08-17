@@ -102,6 +102,9 @@ type UserHome struct {
 	gamingGroup     *adw.PreferencesGroup
 	gamingRow       *adw.ActionRow
 	gamingSwitch    *gtk.Switch
+	driverRow       *adw.ActionRow
+	driverButton    *gtk.Button
+	driverGate      actionstate.Gate
 
 	// Features page references
 	featuresGroup            *adw.PreferencesGroup

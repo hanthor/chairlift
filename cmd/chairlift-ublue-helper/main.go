@@ -61,6 +61,8 @@ func main() {
 		runRollback(ctx, invocation)
 	case ubluehelper.CommandAutoEnable, ubluehelper.CommandAutoDisable:
 		runAutoUpdates(ctx, invocation)
+	case ubluehelper.CommandDriverSwitch:
+		runDriverSwitch(ctx, invocation)
 	}
 }
 
@@ -87,6 +89,32 @@ func runChannelSwitch(ctx context.Context, invocation ubluehelper.Invocation) {
 
 	if err := run(ctx, "bootc", args...); err != nil {
 		fatal(fmt.Sprintf("bootc switch failed: %v", err))
+	}
+	fmt.Printf("switched to %s — restart to apply\n", args[len(args)-1])
+}
+
+// runDriverSwitch moves the host to a different graphics-driver image on the
+// same stream. Like the channel switch, the target reference is derived here
+// from the system image descriptor rather than accepted as an argument.
+func runDriverSwitch(ctx context.Context, invocation ubluehelper.Invocation) {
+	info, err := imageinfo.Detect()
+	if err != nil {
+		fatal(fmt.Sprintf("reading %s: %v", imageinfo.DescriptorPath, err))
+	}
+
+	args, ok := ubluehelper.DriverSwitchArgs(info, invocation.Driver)
+	if !ok {
+		fatal(fmt.Sprintf("no %s image is published for %s:%s",
+			invocation.Driver, info.CleanRef(), info.EffectiveTag()))
+	}
+
+	if invocation.DryRun {
+		fmt.Printf("[DRY-RUN] would execute: bootc %v\n", args)
+		return
+	}
+
+	if err := run(ctx, "bootc", args...); err != nil {
+		fatal(fmt.Sprintf("driver switch failed: %v", err))
 	}
 	fmt.Printf("switched to %s — restart to apply\n", args[len(args)-1])
 }

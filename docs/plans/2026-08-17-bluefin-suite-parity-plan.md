@@ -45,9 +45,9 @@ covered it before this plan.
 | Restart to apply / reboot prompt | ✅ | ✅ | **Done** — `restart` helper subcommand |
 | Rollback to previous deployment | ✅ calendar | ✅ | **Done** — `rollback` helper subcommand |
 | Automatic background updates (uupd timer) | ✅ | ✅ | **Done** — `internal/autoupdate`, one switch |
-| Image variant selection (`-nvidia`, `-dx`) | — | ✅ rebase dialog | **Phase 4** |
-| Pin to dated tag / unpin to stream | — | ✅ | **Phase 4** |
-| GPU detection | ✅ | ✅ | **Phase 4** (needed to offer the right variant) |
+| Image variant selection (`-nvidia`) | — | ✅ rebase dialog | **Done** — `internal/imageinfo` driver table, one hardware-driven offer |
+| Pin to dated tag / unpin to stream | — | ✅ | **Later** — needs a live registry tag listing in the GUI; see Later/ideas |
+| GPU detection | ✅ | ✅ | **Done** — `internal/gpu`, PCI vendor IDs from sysfs |
 | Action journal of privileged operations | — | ✅ | **Phase 5** |
 | Desktop notifications | ✅ `notify-send` | ✅ `GNotification` | **Phase 5** |
 | Update strategy / focus mode / per-layer switches | ✅ | — | **Not porting** — the option sprawl the HIG constraint rules out. Phase 3's single switch replaces it. |
@@ -119,7 +119,7 @@ phases are already unprivileged. The only new privileged surface is
   `chairlift_e2e`-tagged probe stub it captures the switch in its on state.
   Every systemd state `Classify` can see is covered by its own table test.
 
-## Phase 4 — Image variants (medium)
+## Phase 4 — Image variants (medium) — ✅ landed
 
 - Extend `internal/imageinfo`'s per-image table with variant suffixes
   (`-nvidia`, `-nvidia-open`, `-dx`), keeping the same discipline: **verify
@@ -130,7 +130,12 @@ phases are already unprivileged. The only new privileged surface is
 - Pin to a dated tag / unpin to the stream.
 - **Done when:** a table test covers the variant matrix for all three images
   against registry-verified references, and the walkthrough captures the
-  variant row.
+  variant row. **Met.** `internal/imageinfo`'s driver table records the
+  manifest responses per image *and stream*, `internal/gpu` covers the
+  hardware matrix including hybrid laptops, and the walkthrough captures the
+  Graphics Driver row offering a switch on a stubbed NVIDIA machine.
+- Ownership recorded in
+  [ADR-0011](../adr/0011-chairlift-owns-bluefin-family-rebasing.md).
 
 ## Phase 5 — Audit and notification (small)
 
@@ -185,15 +190,19 @@ Approved 2026-08-17.
   contract can be made as simple as one switch.
 - A shipped Brew bundle expressing bluefinctl's curated developer tool list,
   replacing its per-tool install recipes.
+- **Pin to a dated tag / unpin to the stream.** finupdate offers this from its
+  rebase dialog. It needs a live `/v2/<repo>/tags/list` call to populate the
+  dated tags, which puts a network round-trip behind a GUI control and cannot
+  be covered by the gated tests without a fixture server. Worth doing, but as
+  its own phase with a recorded decision about where the network call lives.
 
 ## Open questions
 
-- **Powerwash, Factory Reset, AI/GPU stacks, SBOM changelog:** port or drop?
-  Each is listed above with the reason it is blocked. Decided by the
-  maintainer, before Phase 5.
-- **Is ChairLift the intended home for Bluefin-family system management, or is
-  finupdate?** The two now overlap on updates and rebasing. Worth settling
-  before Phase 4 adds a second rebase UI to the ecosystem.
+- ~~**Powerwash, Factory Reset, AI/GPU stacks, SBOM changelog:** port or
+  drop?~~ **Resolved 2026-08-17:** all three approved. They are Phases 6–8.
+- ~~**Is ChairLift the intended home for Bluefin-family system management, or
+  is finupdate?**~~ **Resolved 2026-08-17:** ChairLift owns rebasing. Recorded
+  as [ADR-0011](../adr/0011-chairlift-owns-bluefin-family-rebasing.md).
 
 ## References
 

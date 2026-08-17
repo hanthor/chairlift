@@ -280,6 +280,11 @@ func (uh *UserHome) buildBluefinGroups(page *adw.PreferencesPage) {
 
 	if channelEnabled {
 		uh.buildChannelGroup(page, status, description)
+		// The graphics driver is the other axis of "which image am I
+		// running", so it shares the Release Channel group rather than
+		// opening a second one. Both stage a bootc switch; one changes the
+		// tag, the other the image name.
+		uh.buildDriverRow(status)
 	}
 	if dxEnabled {
 		uh.buildDeveloperGroup(page, status)
@@ -329,6 +334,80 @@ func (uh *UserHome) buildChannelGroup(page *adw.PreferencesPage, status ublue.St
 	uh.channelGroup = group
 	uh.channelRow = row
 	uh.channelSwitch = toggle
+}
+
+// buildDriverRow adds the graphics-driver row to the Release Channel group.
+// The row is always informational and only offers an action when the
+// hardware wants a different image than the one running and that image is
+// actually published for the current stream.
+func (uh *UserHome) buildDriverRow(status ublue.Status) {
+	if uh.channelGroup == nil {
+		return
+	}
+
+	recommended := ""
+	if status.RecommendedDriver != "" {
+		recommended = status.RecommendedDriver.DisplayName()
+	}
+	presentation := pageview.GraphicsDriverRow(status.Driver.DisplayName(), status.GPU, recommended)
+
+	row := adw.NewActionRow()
+	row.SetTitle(presentation.Title)
+	row.SetSubtitle(presentation.Subtitle)
+
+	if status.RecommendedDriver != "" {
+		driver := status.RecommendedDriver
+		driverRow := row
+		button := gtk.NewButtonWithLabel("Switch")
+		button.SetValign(gtk.AlignCenterValue)
+		button.AddCssClass("suggested-action")
+		clickedCb := func(gtk.Button) {
+			uh.onDriverSwitchClicked(driver, button, driverRow)
+		}
+		button.ConnectClicked(&clickedCb)
+		row.AddSuffix(&button.Widget)
+		uh.driverButton = button
+	}
+
+	uh.channelGroup.Add(&row.Widget)
+	uh.driverRow = row
+	log.Printf("views: graphics driver row built current=%s recommended=%q gpu=%q",
+		status.Driver, status.RecommendedDriver, status.GPU)
+}
+
+// onDriverSwitchClicked stages a switch to the recommended driver image.
+func (uh *UserHome) onDriverSwitchClicked(driver imageinfo.Driver, button *gtk.Button, row *adw.ActionRow) {
+	if !uh.driverGate.TryStart() {
+		return
+	}
+
+	button.SetSensitive(false)
+	button.SetLabel("Switching…")
+
+	go func() {
+		ctx, cancel := ublue.DefaultContext()
+		defer cancel()
+
+		err := ublue.SwitchDriver(ctx, driver)
+
+		sgtk.RunOnMainThread(func() {
+			uh.driverGate.Complete()
+			button.SetSensitive(true)
+			button.SetLabel("Switch")
+
+			if err != nil {
+				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Graphics driver switch failed: %v", err))
+				return
+			}
+
+			decision := actionmsg.DriverSwitch(ublue.IsDryRun(), driver.DisplayName())
+			if decision.Confirm {
+				row.SetSubtitle(pageview.GraphicsDriverResultSubtitle(driver.DisplayName()))
+				button.SetVisible(false)
+			}
+			uh.toastAdder.ShowToast(decision.Toast)
+		})
+	}()
 }
 
 // buildDeveloperGroup builds the developer-mode switch.

@@ -43,6 +43,7 @@ const (
 	CommandRollback      = "rollback"
 	CommandAutoEnable    = "auto-updates-enable"
 	CommandAutoDisable   = "auto-updates-disable"
+	CommandDriverSwitch  = "driver-switch"
 )
 
 // The channel words accepted as channel-switch's second argument. They are
@@ -67,6 +68,7 @@ func DevGroups() []string {
 type Invocation struct {
 	Command string
 	Channel imageinfo.Channel
+	Driver  imageinfo.Driver
 	DryRun  bool
 }
 
@@ -83,6 +85,7 @@ func SupportedCommands() []string {
 		CommandRollback,
 		CommandAutoEnable,
 		CommandAutoDisable,
+		CommandDriverSwitch,
 	}
 }
 
@@ -95,6 +98,7 @@ func SupportedCommands() []string {
 //	rollback [--dry-run]
 //	auto-updates-enable [--dry-run]
 //	auto-updates-disable [--dry-run]
+//	driver-switch <standard|nvidia|nvidia-open> [--dry-run]
 //
 // Everything else — extra arguments, a misplaced flag, an unknown channel
 // word, an unknown command — is rejected.
@@ -119,6 +123,22 @@ func ParseInvocation(args []string) (Invocation, error) {
 			return Invocation{}, usage
 		}
 		return Invocation{Command: CommandChannelSwitch, Channel: channel, DryRun: dryRun}, nil
+
+	case CommandDriverSwitch:
+		usage := fmt.Errorf("usage: chairlift-ublue-helper %s <%s|%s|%s> [--dry-run]",
+			CommandDriverSwitch, imageinfo.DriverStandard, imageinfo.DriverNVIDIA, imageinfo.DriverNVIDIAOpen)
+		if len(args) != 2 && len(args) != 3 {
+			return Invocation{}, usage
+		}
+		driver, ok := parseDriver(args[1])
+		if !ok {
+			return Invocation{}, usage
+		}
+		dryRun := len(args) == 3
+		if dryRun && args[2] != "--dry-run" {
+			return Invocation{}, usage
+		}
+		return Invocation{Command: CommandDriverSwitch, Driver: driver, DryRun: dryRun}, nil
 
 	case CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback,
 		CommandAutoEnable, CommandAutoDisable:
@@ -157,6 +177,39 @@ func parseChannel(word string) (imageinfo.Channel, bool) {
 // would control.
 func RestartArgs() []string {
 	return []string{"reboot"}
+}
+
+// parseDriver accepts only the three published graphics-driver words. An
+// arbitrary suffix would let a caller name any image in the registry
+// namespace, which is exactly what keeping the reference out of argv
+// prevents.
+func parseDriver(word string) (imageinfo.Driver, bool) {
+	switch imageinfo.Driver(word) {
+	case imageinfo.DriverStandard:
+		return imageinfo.DriverStandard, true
+	case imageinfo.DriverNVIDIA:
+		return imageinfo.DriverNVIDIA, true
+	case imageinfo.DriverNVIDIAOpen:
+		return imageinfo.DriverNVIDIAOpen, true
+	default:
+		return "", false
+	}
+}
+
+// DriverSwitchArgs returns the complete `bootc` argv for moving this host to
+// the requested graphics-driver image, keeping the current stream. ok is
+// false when that image is not published for the running image and stream —
+// every LTS host asking for NVIDIA, for one — so the helper refuses rather
+// than staging a switch that would fail to pull.
+//
+// It carries the same --enforce-container-sigpolicy as a channel switch: a
+// driver switch is no less a change of the booted image.
+func DriverSwitchArgs(info imageinfo.Info, driver imageinfo.Driver) ([]string, bool) {
+	target, ok := imageinfo.DriverTarget(info.CleanRef(), info.EffectiveTag(), driver)
+	if !ok {
+		return nil, false
+	}
+	return []string{"switch", "--enforce-container-sigpolicy", target}, true
 }
 
 // RollbackArgs returns the `bootc` argv that makes the previous deployment

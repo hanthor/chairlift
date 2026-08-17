@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/frostyard/chairlift/internal/autoupdate"
+	"github.com/frostyard/chairlift/internal/gpu"
 	"github.com/frostyard/chairlift/internal/ublue"
 )
 
@@ -23,6 +24,13 @@ import (
 func applyImageInfoOverride() {
 	if path := os.Getenv("CHAIRLIFT_IMAGE_INFO"); path != "" {
 		ublue.SetDescriptorOverride(path)
+	}
+
+	// $CHAIRLIFT_GPU_VENDORS is a comma-separated list of PCI vendor IDs, so
+	// the walkthrough can capture the graphics-driver row for hardware the
+	// capture host does not have.
+	if spec := os.Getenv("CHAIRLIFT_GPU_VENDORS"); spec != "" {
+		gpu.SetVendorIDs(strings.Split(spec, ","))
 	}
 
 	// $CHAIRLIFT_AUTO_UPDATES is "<is-enabled>,<is-active>" — the two

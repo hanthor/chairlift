@@ -146,3 +146,26 @@ func TestAutomaticUpdatesLiveToastsNameTheDirection(t *testing.T) {
 		t.Errorf("AutomaticUpdates toasts do not name the direction: on=%q off=%q", on.Toast, off.Toast)
 	}
 }
+
+func TestDriverSwitchNeverConfirmsUnderDryRun(t *testing.T) {
+	decision := DriverSwitch(true, "NVIDIA (proprietary)")
+	if decision.Confirm {
+		t.Error("DriverSwitch(true, _).Confirm = true, want false")
+	}
+	if !strings.Contains(decision.Toast, "[DRY-RUN]") {
+		t.Errorf("DriverSwitch(true, _).Toast = %q, want a dry-run preview", decision.Toast)
+	}
+}
+
+func TestDriverSwitchLiveToastNamesTheImageAndRestart(t *testing.T) {
+	decision := DriverSwitch(false, "NVIDIA (proprietary)")
+	if !decision.Confirm {
+		t.Error("DriverSwitch(false, _).Confirm = false, want true")
+	}
+	if !strings.Contains(decision.Toast, "NVIDIA (proprietary)") {
+		t.Errorf("DriverSwitch toast %q does not name the image", decision.Toast)
+	}
+	if !strings.Contains(decision.Toast, "Restart") {
+		t.Errorf("DriverSwitch toast %q does not ask for a restart", decision.Toast)
+	}
+}

@@ -429,3 +429,33 @@ func AutomaticUpdatesResultSubtitle(enabled bool) string {
 	}
 	return "Automatic updates are off — use Update All when you want to update"
 }
+
+// GraphicsDriverRow returns the graphics-driver row text. current is the
+// driver flavour of the running image, hardware describes the detected GPU,
+// and recommended is non-empty only when a switch is both possible and
+// worthwhile.
+//
+// The row is informational whenever there is nothing to offer, which is the
+// common case: an AMD or Intel machine is already correct, and an LTS host
+// has no driver image published at all.
+func GraphicsDriverRow(current, hardware, recommended string) Row {
+	row := Row{Title: "Graphics Driver"}
+	switch {
+	case recommended != "":
+		row.Subtitle = fmt.Sprintf("%s detected — switch to the %s image, then restart", hardware, recommended)
+	case current != "" && hardware != "":
+		row.Subtitle = fmt.Sprintf("%s · running the %s image", hardware, current)
+	case hardware != "":
+		row.Subtitle = hardware
+	default:
+		row.Subtitle = "No graphics hardware detected"
+	}
+	return row
+}
+
+// GraphicsDriverResultSubtitle returns the subtitle after a driver switch is
+// staged. Like a channel switch it only stages the image, so it never claims
+// the running system changed.
+func GraphicsDriverResultSubtitle(driver string) string {
+	return fmt.Sprintf("Switched to the %s image — restart to apply", driver)
+}

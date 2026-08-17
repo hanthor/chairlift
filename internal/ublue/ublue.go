@@ -23,6 +23,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/frostyard/chairlift/internal/gpu"
 	"github.com/frostyard/chairlift/internal/imageinfo"
 	"github.com/frostyard/chairlift/internal/ubluehelper"
 )
@@ -97,6 +98,13 @@ type Status struct {
 	Developer   bool
 	DevGroups   []string
 	CanSwitchTo imageinfo.Channel
+	// Driver is the graphics-driver flavour of the running image.
+	Driver imageinfo.Driver
+	// RecommendedDriver is the driver this machine's hardware wants, set
+	// only when switching to it is both possible and worthwhile.
+	RecommendedDriver imageinfo.Driver
+	// GPU describes the detected graphics hardware.
+	GPU string
 }
 
 // Detect returns the current Bluefin-family status. A host with no image
@@ -167,6 +175,13 @@ func Detect() (Status, error) {
 	}
 	status.Developer, status.DevGroups = DeveloperState(groups)
 
+	status.Driver = info.Driver()
+	hardware := detectGPU()
+	status.GPU = hardware.Describe()
+	if recommended, offer := info.RecommendedDriver(hardware.NVIDIA); offer {
+		status.RecommendedDriver = recommended
+	}
+
 	// Offer the switch only in the direction the running tag actually has a
 	// counterpart for. A pinned or unrecognized tag offers neither.
 	if _, ok := info.SwitchTarget(imageinfo.ChannelTesting); ok {
@@ -205,6 +220,10 @@ func DeveloperState(groups []string) (bool, []string) {
 	}
 	return true, matched
 }
+
+// detectGPU is an injection seam for the graphics-hardware probe, so
+// Detect's driver recommendation is testable on any machine.
+var detectGPU = gpu.Detect
 
 // lookupGroups is an injection seam so DeveloperState's caller can be tested
 // without depending on the test host's real group membership. Its production
@@ -281,6 +300,19 @@ func SetAutomaticUpdates(ctx context.Context, enabled bool) error {
 		command = ubluehelper.CommandAutoEnable
 	}
 	_, _, err := runHelper(ctx, pkexecCommand, command)
+	return err
+}
+
+// SwitchDriver moves this host to a different graphics-driver image on the
+// same stream. Only the driver word crosses the pkexec boundary; the helper
+// resolves the image reference itself.
+func SwitchDriver(ctx context.Context, driver imageinfo.Driver) error {
+	switch driver {
+	case imageinfo.DriverStandard, imageinfo.DriverNVIDIA, imageinfo.DriverNVIDIAOpen:
+	default:
+		return &Error{Message: fmt.Sprintf("unsupported graphics driver %q", driver)}
+	}
+	_, _, err := runHelper(ctx, pkexecCommand, ubluehelper.CommandDriverSwitch, string(driver))
 	return err
 }
 

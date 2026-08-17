@@ -216,6 +216,11 @@ func TestInstalledBundleAndHelperBoundary(t *testing.T) {
 		// mask any systemd unit on the machine.
 		{name: "ublue auto updates with a unit", helper: "chairlift-ublue-helper", args: []string{"auto-updates-enable", "sshd.service"}, wantStderr: "usage: chairlift-ublue-helper auto-updates-enable"},
 		{name: "ublue auto updates with a flag", helper: "chairlift-ublue-helper", args: []string{"auto-updates-disable", "--now"}, wantStderr: "usage: chairlift-ublue-helper auto-updates-disable"},
+		// The driver word is validated against a fixed set; an image
+		// reference must never stand in for it.
+		{name: "ublue driver switch with an image ref", helper: "chairlift-ublue-helper", args: []string{"driver-switch", "ghcr.io/evil/image:latest"}, wantStderr: "usage: chairlift-ublue-helper driver-switch"},
+		{name: "ublue driver switch with an unknown driver", helper: "chairlift-ublue-helper", args: []string{"driver-switch", "nouveau"}, wantStderr: "usage: chairlift-ublue-helper driver-switch"},
+		{name: "ublue driver switch without a driver", helper: "chairlift-ublue-helper", args: []string{"driver-switch"}, wantStderr: "usage: chairlift-ublue-helper driver-switch"},
 	}
 
 	for _, test := range tests {

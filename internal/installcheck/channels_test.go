@@ -93,6 +93,7 @@ func TestChannelTableIsNotInstalledLive(t *testing.T) {
 func TestDescriptorOverrideStaysBehindTheE2EBuildTag(t *testing.T) {
 	const envVar = "CHAIRLIFT_IMAGE_INFO"
 	const autoUpdatesEnvVar = "CHAIRLIFT_AUTO_UPDATES"
+	const gpuEnvVar = "CHAIRLIFT_GPU_VENDORS"
 
 	overrideSource := readRepoFile(t, filepath.Join("internal", "app", "imageinfo_override_e2e.go"))
 	if !strings.HasPrefix(overrideSource, "//go:build chairlift_e2e") {
@@ -103,8 +104,10 @@ func TestDescriptorOverrideStaysBehindTheE2EBuildTag(t *testing.T) {
 	}
 	// The automatic-updates probe override shares the same file and the same
 	// build tag, so it is covered by the same guard.
-	if !strings.Contains(overrideSource, autoUpdatesEnvVar) {
-		t.Errorf("the tagged override does not read %s", autoUpdatesEnvVar)
+	for _, required := range []string{autoUpdatesEnvVar, gpuEnvVar} {
+		if !strings.Contains(overrideSource, required) {
+			t.Errorf("the tagged override does not read %s", required)
+		}
 	}
 
 	// The default build must carry a no-op with the negated tag, or the
@@ -113,7 +116,7 @@ func TestDescriptorOverrideStaysBehindTheE2EBuildTag(t *testing.T) {
 	if !strings.HasPrefix(untagged, "//go:build !chairlift_e2e") {
 		t.Error("internal/app/imageinfo_override.go does not open with //go:build !chairlift_e2e")
 	}
-	for _, forbidden := range []string{envVar, autoUpdatesEnvVar} {
+	for _, forbidden := range []string{envVar, autoUpdatesEnvVar, gpuEnvVar} {
 		if strings.Contains(untagged, forbidden) {
 			t.Errorf("the default build's override reads %s; it must be a no-op", forbidden)
 		}
@@ -124,11 +127,12 @@ func TestDescriptorOverrideStaysBehindTheE2EBuildTag(t *testing.T) {
 		filepath.Join("internal", "app", "app.go"),
 		filepath.Join("internal", "ublue", "ublue.go"),
 		filepath.Join("internal", "autoupdate", "autoupdate.go"),
+		filepath.Join("internal", "gpu", "gpu.go"),
 		filepath.Join("cmd", "chairlift", "main.go"),
 		filepath.Join("cmd", "chairlift-ublue-helper", "main.go"),
 	} {
 		source := readRepoFile(t, relative)
-		for _, forbidden := range []string{envVar, autoUpdatesEnvVar} {
+		for _, forbidden := range []string{envVar, autoUpdatesEnvVar, gpuEnvVar} {
 			if strings.Contains(source, forbidden) {
 				t.Errorf("%s reads %s outside the chairlift_e2e build tag", relative, forbidden)
 			}

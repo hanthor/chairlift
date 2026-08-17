@@ -83,6 +83,27 @@ inactive with the reason in its subtitle, rather than staging a switch to an
 image that would fail to pull. Downstream images add themselves through a
 [`channels.yml`](../channels.example.yml) file; no code change needed.
 
+**Graphics Driver** shows the hardware ChairLift detected and which driver
+image you are running. Universal Blue ships NVIDIA's driver as a *separate
+image* rather than layering it, so getting it is a `bootc switch` — which is
+why this sits with the release channel: both change which image boots, one by
+tag and one by name.
+
+The row only offers an action when it helps: an NVIDIA card running the
+standard image is offered the NVIDIA one, as above. It never pushes a machine
+*off* a driver image, and it never chooses between the proprietary driver and
+the open kernel modules, because that depends on the GPU generation and
+choosing wrong leaves an unbootable desktop.
+
+Like the channel switch, availability is verified rather than assumed. The
+driver images are published for the `latest`, `stable`, `gts`, and `beta`
+streams only — `ghcr.io/ublue-os/bluefin-nvidia:lts` is a 404 — so an LTS host
+with an NVIDIA card is told what it has and offered nothing, rather than being
+sent to an image that would fail to pull. Detection reads PCI vendor IDs from
+sysfs rather than asking `nvidia-smi`, which only exists once the driver is
+already installed and would therefore answer "no NVIDIA card" on exactly the
+machines that need the offer.
+
 **Developer Mode** adds your account to the container, VM, and serial-device
 groups (`docker`, `incus-admin`, `libvirt`, `dialout`), which takes effect at
 your next login. The subtitle says plainly that it does *not* rebase you to a
@@ -160,11 +181,12 @@ Update All groups were really built.
 The application always runs with `--dry-run`, so no screenshot can be produced
 by a session that changed anything on the machine.
 
-Two things the capture host cannot have are supplied by stubs compiled only
-into the `chairlift_e2e` build — a Dakota image descriptor and an
-unattended-update timer state — so the Bluefin-family rows and the Automatic
-Updates switch render on an ordinary workstation. No released binary contains
-a code path that reads them, which `make ci` asserts.
+Three things the capture host cannot have are supplied by stubs compiled only
+into the `chairlift_e2e` build — a Dakota image descriptor, an
+unattended-update timer state, and an NVIDIA GPU — so the Bluefin-family rows,
+the Automatic Updates switch, and the Graphics Driver offer render on an
+ordinary workstation. No released binary contains a code path that reads them,
+which `make ci` asserts.
 
 Screenshots are **not** regenerated on every commit: font hinting and GTK
 point releases move pixels, so per-push regeneration would churn the

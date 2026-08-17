@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/frostyard/chairlift/internal/gpu"
 	"github.com/frostyard/chairlift/internal/imageinfo"
 	"github.com/frostyard/chairlift/internal/ubluehelper"
 )
@@ -214,12 +215,18 @@ func TestDeveloperStateMatchesAnyDeveloperGroup(t *testing.T) {
 // descriptor and the invoking user's group membership.
 func stubDetection(t *testing.T, info imageinfo.Info, infoErr error, groups []string) {
 	t.Helper()
+	stubDetectionWithGPU(t, info, infoErr, groups, gpu.Set{})
+}
 
-	previousInfo, previousGroups := detectInfo, lookupGroups
+func stubDetectionWithGPU(t *testing.T, info imageinfo.Info, infoErr error, groups []string, hardware gpu.Set) {
+	t.Helper()
+
+	previousInfo, previousGroups, previousGPU := detectInfo, lookupGroups, detectGPU
 	detectInfo = func() (imageinfo.Info, error) { return info, infoErr }
 	lookupGroups = func() ([]string, error) { return groups, nil }
+	detectGPU = func() gpu.Set { return hardware }
 	t.Cleanup(func() {
-		detectInfo, lookupGroups = previousInfo, previousGroups
+		detectInfo, lookupGroups, detectGPU = previousInfo, previousGroups, previousGPU
 	})
 }
 
@@ -241,6 +248,8 @@ func TestDetectCoversEverySupportedVariant(t *testing.T) {
 				Tag:         "latest",
 				Ref:         "ghcr.io/projectbluefin/dakota",
 				CanSwitchTo: imageinfo.ChannelTesting,
+				Driver:      imageinfo.DriverStandard,
+				GPU:         "No graphics hardware detected",
 			},
 		},
 		{
@@ -258,6 +267,8 @@ func TestDetectCoversEverySupportedVariant(t *testing.T) {
 				Developer:   true,
 				DevGroups:   []string{"docker", "libvirt"},
 				CanSwitchTo: imageinfo.ChannelUnknown,
+				Driver:      imageinfo.DriverStandard,
+				GPU:         "No graphics hardware detected",
 			},
 		},
 		{
@@ -271,6 +282,8 @@ func TestDetectCoversEverySupportedVariant(t *testing.T) {
 				Tag:         "lts",
 				Ref:         "ghcr.io/ublue-os/bluefin",
 				CanSwitchTo: imageinfo.ChannelTesting,
+				Driver:      imageinfo.DriverStandard,
+				GPU:         "No graphics hardware detected",
 			},
 		},
 		{
@@ -284,6 +297,8 @@ func TestDetectCoversEverySupportedVariant(t *testing.T) {
 				Tag:         "lts",
 				Ref:         "ghcr.io/projectbluefin/bluefin-lts",
 				CanSwitchTo: imageinfo.ChannelTesting,
+				Driver:      imageinfo.DriverStandard,
+				GPU:         "No graphics hardware detected",
 			},
 		},
 		{
@@ -297,6 +312,8 @@ func TestDetectCoversEverySupportedVariant(t *testing.T) {
 				Tag:         "testing",
 				Ref:         "ghcr.io/projectbluefin/bluefin-lts",
 				CanSwitchTo: imageinfo.ChannelStable,
+				Driver:      imageinfo.DriverStandard,
+				GPU:         "No graphics hardware detected",
 			},
 		},
 		{
@@ -310,6 +327,8 @@ func TestDetectCoversEverySupportedVariant(t *testing.T) {
 				Tag:         "latest.20260212",
 				Ref:         "ghcr.io/projectbluefin/dakota",
 				CanSwitchTo: imageinfo.ChannelUnknown,
+				Driver:      imageinfo.DriverStandard,
+				GPU:         "No graphics hardware detected",
 			},
 		},
 	}
@@ -352,5 +371,87 @@ func TestDetectReportsMalformedDescriptor(t *testing.T) {
 
 	if _, err := Detect(); err == nil {
 		t.Fatal("Detect() error = nil, want a non-nil error for an unreadable descriptor")
+	}
+}
+
+// The driver recommendation must only appear where a switch is both possible
+// and useful, so Detect is asserted across the hardware/image matrix rather
+// than only on the machine the tests happen to run on.
+func TestDetectRecommendsADriverOnlyWhenItHelps(t *testing.T) {
+	tests := []struct {
+		name            string
+		info            imageinfo.Info
+		hardware        gpu.Set
+		wantDriver      imageinfo.Driver
+		wantRecommended imageinfo.Driver
+		wantGPU         string
+	}{
+		{
+			name:            "nvidia card on the standard dakota image",
+			info:            imageinfo.Info{Name: "dakota", Tag: "latest", Ref: "docker://ghcr.io/projectbluefin/dakota"},
+			hardware:        gpu.Set{NVIDIA: true},
+			wantDriver:      imageinfo.DriverStandard,
+			wantRecommended: imageinfo.DriverNVIDIA,
+			wantGPU:         "NVIDIA",
+		},
+		{
+			name:            "hybrid laptop is recommended the nvidia image",
+			info:            imageinfo.Info{Name: "bluefin", Tag: "latest", Ref: "docker://ghcr.io/ublue-os/bluefin"},
+			hardware:        gpu.Set{NVIDIA: true, Intel: true},
+			wantDriver:      imageinfo.DriverStandard,
+			wantRecommended: imageinfo.DriverNVIDIA,
+			wantGPU:         "NVIDIA + Intel",
+		},
+		{
+			name:       "amd machine is left alone",
+			info:       imageinfo.Info{Name: "bluefin", Tag: "latest", Ref: "docker://ghcr.io/ublue-os/bluefin"},
+			hardware:   gpu.Set{AMD: true},
+			wantDriver: imageinfo.DriverStandard,
+			wantGPU:    "AMD",
+		},
+		{
+			name:       "already on the nvidia image",
+			info:       imageinfo.Info{Name: "bluefin", Tag: "latest", Ref: "docker://ghcr.io/ublue-os/bluefin-nvidia"},
+			hardware:   gpu.Set{NVIDIA: true},
+			wantDriver: imageinfo.DriverNVIDIA,
+			wantGPU:    "NVIDIA",
+		},
+		{
+			// No driver image is published for the LTS streams, so there is
+			// nothing to recommend even with the hardware present.
+			name:       "nvidia card on an lts host",
+			info:       imageinfo.Info{Name: "bluefin", Tag: "lts", Ref: "docker://ghcr.io/ublue-os/bluefin"},
+			hardware:   gpu.Set{NVIDIA: true},
+			wantDriver: imageinfo.DriverStandard,
+			wantGPU:    "NVIDIA",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			stubDetectionWithGPU(t, test.info, nil, nil, test.hardware)
+
+			got, err := Detect()
+			if err != nil {
+				t.Fatalf("Detect() error = %v, want nil", err)
+			}
+			if got.Driver != test.wantDriver {
+				t.Errorf("Driver = %q, want %q", got.Driver, test.wantDriver)
+			}
+			if got.RecommendedDriver != test.wantRecommended {
+				t.Errorf("RecommendedDriver = %q, want %q", got.RecommendedDriver, test.wantRecommended)
+			}
+			if got.GPU != test.wantGPU {
+				t.Errorf("GPU = %q, want %q", got.GPU, test.wantGPU)
+			}
+		})
+	}
+}
+
+func TestSwitchDriverRejectsUnpublishedDrivers(t *testing.T) {
+	for _, driver := range []imageinfo.Driver{"", "amdgpu", "nouveau", imageinfo.Driver("nvidia-closed")} {
+		if err := SwitchDriver(context.Background(), driver); err == nil {
+			t.Errorf("SwitchDriver(%q) error = nil, want a refusal before pkexec is reached", driver)
+		}
 	}
 }

@@ -170,6 +170,7 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 		ubluehelper.CommandRollback,
 		ubluehelper.CommandAutoEnable,
 		ubluehelper.CommandAutoDisable,
+		ubluehelper.CommandDriverSwitch,
 	}
 	if !reflect.DeepEqual(ublueCommands, expectedUblueCommands) {
 		t.Fatalf("ubluehelper.SupportedCommands() = %v, want %v", ublueCommands, expectedUblueCommands)
@@ -224,6 +225,13 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 			Message:     "Authentication is required to disable automatic background updates",
 			Path:        ublue.HelperPath,
 			Argv1:       ubluehelper.CommandAutoDisable,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.driver-switch",
+			Description: "Switch the system graphics driver image",
+			Message:     "Authentication is required to switch the system graphics driver image",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandDriverSwitch,
 		},
 	})
 

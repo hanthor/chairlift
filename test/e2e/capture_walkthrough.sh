@@ -95,6 +95,11 @@ export CHAIRLIFT_IMAGE_INFO
 # uupd.timer, for the same reason. The value is the pair of systemctl answers
 # autoupdate.Classify consumes; "enabled,active" is the switch-on state.
 : "${CHAIRLIFT_AUTO_UPDATES:=enabled,active}"
+# An NVIDIA card on an Intel laptop, so the graphics-driver row renders with
+# a switch to offer. 0x10de is NVIDIA's PCI vendor ID, 0x8086 Intel's.
+: "${CHAIRLIFT_GPU_VENDORS:=0x8086,0x10de}"
+export CHAIRLIFT_GPU_VENDORS
+
 export CHAIRLIFT_AUTO_UPDATES
 
 
