@@ -40,7 +40,7 @@ covered it before this plan.
 | Per-image release-channel table + override | — | partial | **Done** — `channels.yml` |
 | **Update All** (OS + Flatpak + Brew, one action) | ✅ `bctl update` | ✅ hero button | **Done** — `internal/updateall` |
 | Restart to apply / reboot prompt | ✅ | ✅ | **Done** — `restart` helper subcommand |
-| Rollback to previous deployment | ✅ calendar | ✅ | **Phase 2** |
+| Rollback to previous deployment | ✅ calendar | ✅ | **Done** — `rollback` helper subcommand |
 | Automatic background updates (uupd timer) | ✅ | ✅ | **Phase 3** |
 | Image variant selection (`-nvidia`, `-dx`) | — | ✅ rebase dialog | **Phase 4** |
 | Pin to dated tag / unpin to stream | — | ✅ | **Phase 4** |
@@ -49,9 +49,9 @@ covered it before this plan.
 | Desktop notifications | ✅ `notify-send` | ✅ `GNotification` | **Phase 5** |
 | Update strategy / focus mode / per-layer switches | ✅ | — | **Not porting** — the option sprawl the HIG constraint rules out. Phase 3's single switch replaces it. |
 | Reboot-on-logout / scheduled reboot window | ✅ | ✅ "Restart Tonight" | **Deferred** — needs a systemd user unit contract; revisit after Phase 3 |
-| Powerwash / Factory Reset | — | ✅ | **Blocked on sign-off** — irreversible, and `bootc install reset` is `--experimental` |
-| AI / GPU container stacks | ✅ | — | **Blocked on sign-off** — ~30 quadlet files; an app catalog, not system management |
-| Changelog / SBOM diff between images | — | ✅ | **Blocked on sign-off** — 977 lines, GHCR referrers API + SPDX parsing, network-dependent |
+| Powerwash / Factory Reset | — | ✅ | **Approved 2026-08-17** — Phase 6. Irreversible, so both need an explicit typed/confirmed dialog and `bootc install reset` must stay behind its `--experimental` warning |
+| AI / GPU container stacks | ✅ | — | **Approved 2026-08-17** — Phase 7. Must arrive as one "AI stack" choice per detected GPU, not a 30-entry catalog |
+| Changelog / SBOM diff between images | — | ✅ | **Approved 2026-08-17** — Phase 8. Needs an offline-testable SPDX parser seam; the network call cannot be in the gated tests |
 | D-Bus progress publishing | — | ✅ | **Not porting** — exists to feed finupdate's GNOME Shell extension; no consumer here |
 | Dev tools installer (docker, Lima/WSL, editors, VMs) | ✅ | — | **Not porting as recipes** — ChairLift already has Brew search/install, Flatpak install, and configurable `brew_bundles_group` `bundles_paths`. The curated list belongs in a shipped bundle file, not ~500 lines of per-tool install code. |
 | GNOME Control Center panel | — | ✅ | **Not porting** — finupdate ships a C panel + patches against gnome-control-center; out of scope for a standalone app |
@@ -85,7 +85,7 @@ phases are already unprivileged. The only new privileged surface is
   screenshot, because a dry-run run completes faster than a frame can be
   captured and racing it would make the check flaky.
 
-## Phase 2 — Rollback (small)
+## Phase 2 — Rollback (small) — ✅ landed
 
 - `bootc rollback` via a new `chairlift-ublue-helper` subcommand + action.
 - Presented as a single row naming the deployment being returned to, mirroring
@@ -93,6 +93,11 @@ phases are already unprivileged. The only new privileged surface is
   rollback calendar.
 - **Done when:** the walkthrough captures the rollback row naming the previous
   deployment on a host with one, and its absence on a host without.
+  **Met** for the absent case, which is what the CI runner is: the row stays
+  hidden and the walkthrough's Updates frame shows the System Updates group
+  without it. The present case is covered by `pageview`'s table test over the
+  version/timestamp matrix and by the boundary test asserting the helper
+  rejects any caller-supplied rollback target.
 
 ## Phase 3 — Automatic background updates (small)
 
@@ -124,6 +129,44 @@ phases are already unprivileged. The only new privileged surface is
 - Desktop notification on completion of a long-running operation.
 - **Done when:** the e2e boundary test asserts a journal entry per privileged
   invocation.
+
+## Phase 6 — Powerwash and Factory Reset (medium)
+
+Approved 2026-08-17. Both are irreversible, which sets the bar for how they
+are presented and tested.
+
+- Powerwash: `flatpak uninstall --user --all` plus `distrobox rm -f -a`. No
+  privilege required — it is all user-scope, like gaming mode.
+- Factory Reset: `bootc install reset --experimental --apply` through a new
+  helper subcommand + action. The `--experimental` flag must be surfaced in
+  the confirmation, not hidden.
+- Both behind an `AdwAlertDialog` with a destructive-styled confirm, per the
+  HIG's rule that destructive dialogs are reserved for non-undoable actions.
+- **Done when:** the walkthrough captures both confirmation dialogs, and the
+  e2e boundary test asserts the helper rejects a factory reset invocation
+  carrying any argument.
+
+## Phase 7 — AI stacks (medium)
+
+Approved 2026-08-17, with the constraint that it arrives as one choice per
+detected GPU rather than bluefinctl's full quadlet catalog.
+
+- GPU detection selects the stack; the user sees a single switch, not a
+  vendor/stack matrix.
+- Quadlet units installed user-scope under `~/.config/containers/systemd/`.
+- **Done when:** a table test covers stack selection for Nvidia, AMD, Intel,
+  and no-GPU hosts, and the walkthrough captures the row on a stubbed GPU.
+
+## Phase 8 — Changelog / SBOM diff (large)
+
+Approved 2026-08-17.
+
+- SPDX parsing and package diffing behind a pure package with the network
+  fetch as a seam, so the gated tests never make a request.
+- Presented as a drill-down from the staged-update row, not as a top-level
+  page.
+- **Done when:** the diff is table-tested against checked-in SPDX fixtures,
+  and the walkthrough captures the drill-down.
 
 ## Later / ideas
 

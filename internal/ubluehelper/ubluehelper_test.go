@@ -59,6 +59,16 @@ func TestParseInvocationAcceptsSupportedShapes(t *testing.T) {
 			args: []string{"restart", "--dry-run"},
 			want: Invocation{Command: CommandRestart, DryRun: true},
 		},
+		{
+			name: "rollback",
+			args: []string{"rollback"},
+			want: Invocation{Command: CommandRollback},
+		},
+		{
+			name: "rollback dry run",
+			args: []string{"rollback", "--dry-run"},
+			want: Invocation{Command: CommandRollback, DryRun: true},
+		},
 	}
 
 	for _, test := range tests {
@@ -101,6 +111,11 @@ func TestParseInvocationRejectsEveryUnsupportedShape(t *testing.T) {
 		{name: "restart with a delay", args: []string{"restart", "02:00"}},
 		{name: "restart with a target", args: []string{"restart", "--force"}},
 		{name: "restart with extra argument", args: []string{"restart", "--dry-run", "now"}},
+		// Rolling back to an arbitrary image is a channel switch, not this
+		// operation; a target here must be rejected outright.
+		{name: "rollback with a target image", args: []string{"rollback", "ghcr.io/evil/image:old"}},
+		{name: "rollback with a deployment index", args: []string{"rollback", "1"}},
+		{name: "rollback with extra argument", args: []string{"rollback", "--dry-run", "1"}},
 		{name: "updex command is not accepted here", args: []string{"enable-feature", "demo"}},
 	}
 
@@ -119,7 +134,7 @@ func TestParseInvocationRejectsEveryUnsupportedShape(t *testing.T) {
 
 func TestSupportedCommandsMatchesParser(t *testing.T) {
 	commands := SupportedCommands()
-	want := []string{CommandChannelSwitch, CommandDXEnable, CommandDXDisable, CommandRestart}
+	want := []string{CommandChannelSwitch, CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback}
 	if !reflect.DeepEqual(commands, want) {
 		t.Fatalf("SupportedCommands() = %v, want %v", commands, want)
 	}
@@ -151,6 +166,18 @@ func TestRestartArgsTakeNoCallerControlledValues(t *testing.T) {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") || strings.Contains(arg, ":") || strings.Contains(arg, "/") {
 			t.Errorf("RestartArgs() carries %q; the restart argv must be fixed", arg)
+		}
+	}
+}
+
+func TestRollbackArgsTakeNoCallerControlledValues(t *testing.T) {
+	args := RollbackArgs()
+	if !reflect.DeepEqual(args, []string{"rollback"}) {
+		t.Fatalf("RollbackArgs() = %v, want [rollback]", args)
+	}
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") || strings.Contains(arg, "/") || strings.Contains(arg, ":") {
+			t.Errorf("RollbackArgs() carries %q; the rollback argv must be fixed", arg)
 		}
 	}
 }

@@ -208,6 +208,10 @@ func TestInstalledBundleAndHelperBoundary(t *testing.T) {
 		{name: "ublue restart with a delay", helper: "chairlift-ublue-helper", args: []string{"restart", "02:00"}, wantStderr: "usage: chairlift-ublue-helper restart"},
 		{name: "ublue restart with a flag", helper: "chairlift-ublue-helper", args: []string{"restart", "--force"}, wantStderr: "usage: chairlift-ublue-helper restart"},
 		{name: "ublue restart with extra argument", helper: "chairlift-ublue-helper", args: []string{"restart", "--dry-run", "now"}, wantStderr: "usage: chairlift-ublue-helper restart"},
+		// Rolling back to an arbitrary image is a channel switch, not this
+		// operation.
+		{name: "ublue rollback with a target image", helper: "chairlift-ublue-helper", args: []string{"rollback", "ghcr.io/evil/image:old"}, wantStderr: "usage: chairlift-ublue-helper rollback"},
+		{name: "ublue rollback with a deployment index", helper: "chairlift-ublue-helper", args: []string{"rollback", "1"}, wantStderr: "usage: chairlift-ublue-helper rollback"},
 	}
 
 	for _, test := range tests {

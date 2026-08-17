@@ -77,6 +77,9 @@ type UserHome struct {
 	bootcStageBtn      *gtk.Button
 	bootcActivityRow   *adw.ActionRow
 	bootcLogExpander   *adw.ExpanderRow
+	bootcRollbackRow   *adw.ActionRow
+	bootcRollbackBtn   *gtk.Button
+	bootcRollbackGate  actionstate.Gate
 
 	// native A/B (sysupdate) update references
 	sysupdateStageExpander *adw.ExpanderRow

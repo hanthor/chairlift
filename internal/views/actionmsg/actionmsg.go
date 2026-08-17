@@ -440,3 +440,21 @@ func GamingMode(dryRun bool, enable bool, changed, failed, skipped int) FeatureT
 		}
 	}
 }
+
+// Rollback decides whether the rollback row should adopt its
+// rolled-back subtitle, and what toast to show. Confirm is exactly !dryRun,
+// for the same reason as FeatureToggle: under dry-run ublue.runHelper
+// short-circuits before pkexec, so no deployment was reordered and claiming
+// otherwise would misreport what will boot next.
+func Rollback(dryRun bool) FeatureToggleDecision {
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   "[DRY-RUN] Preview: would roll back to the previous system image — no changes made",
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   "Rolled back. Restart to boot the previous image.",
+	}
+}

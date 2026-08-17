@@ -376,3 +376,32 @@ func RestartRow(version string) Row {
 		Subtitle: fmt.Sprintf("Version %s is staged and takes effect after a restart", version),
 	}
 }
+
+// BootcRollbackRow returns the bootc rollback row text. version and timestamp
+// describe the deployment the host would return to; either may be empty.
+//
+// It is deliberately a single row naming one destination, not a history
+// browser: `bootc rollback` has exactly one target — the deployment the host
+// already records — so offering a choice would imply a capability the
+// operation does not have.
+func BootcRollbackRow(version, timestamp string) Row {
+	row := Row{Title: "Roll Back"}
+	switch {
+	case version == "" && timestamp == "":
+		row.Subtitle = "No previous system image is available"
+	case version == "":
+		row.Subtitle = fmt.Sprintf("Return to the image from %s at the next restart", timestamp)
+	case timestamp == "":
+		row.Subtitle = fmt.Sprintf("Return to version %s at the next restart", version)
+	default:
+		row.Subtitle = fmt.Sprintf("Return to version %s (%s) at the next restart", version, timestamp)
+	}
+	return row
+}
+
+// BootcRollbackResultSubtitle returns the subtitle after a rollback is
+// staged. Rolling back only changes which deployment boots next, so it never
+// claims the running system changed.
+func BootcRollbackResultSubtitle() string {
+	return "Rolled back — restart to boot the previous image"
+}

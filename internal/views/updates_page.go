@@ -11,6 +11,7 @@ import (
 	"github.com/frostyard/chairlift/internal/flatpak"
 	"github.com/frostyard/chairlift/internal/homebrew"
 	"github.com/frostyard/chairlift/internal/sysupdate"
+	"github.com/frostyard/chairlift/internal/ublue"
 	"github.com/frostyard/chairlift/internal/views/actionmsg"
 	"github.com/frostyard/chairlift/internal/views/actionstate"
 	"github.com/frostyard/chairlift/internal/views/badgestate"
@@ -60,9 +61,28 @@ func (uh *UserHome) buildUpdatesPage() {
 		uh.bootcStageExpander.AddSuffix(&uh.bootcStageBtn.Widget)
 
 		group.Add(&uh.bootcStageExpander.Widget)
+
+		// Roll Back returns to the deployment bootc already records as the
+		// rollback target. It is hidden until that deployment is confirmed
+		// to exist, so a fresh install never offers a rollback to nothing.
+		uh.bootcRollbackRow = adw.NewActionRow()
+		rollbackPresentation := pageview.BootcRollbackRow("", "")
+		uh.bootcRollbackRow.SetTitle(rollbackPresentation.Title)
+		uh.bootcRollbackRow.SetSubtitle(rollbackPresentation.Subtitle)
+		uh.bootcRollbackBtn = gtk.NewButtonWithLabel("Roll Back")
+		uh.bootcRollbackBtn.SetValign(gtk.AlignCenterValue)
+		rollbackClickedCb := func(gtk.Button) {
+			uh.onBootcRollbackClicked()
+		}
+		uh.bootcRollbackBtn.ConnectClicked(&rollbackClickedCb)
+		uh.bootcRollbackRow.AddSuffix(&uh.bootcRollbackBtn.Widget)
+		uh.bootcRollbackRow.SetVisible(false)
+		group.Add(&uh.bootcRollbackRow.Widget)
+
 		page.Add(group)
 
 		go uh.loadBootcUpdateStatus(group)
+		go uh.loadBootcRollbackStatus()
 	}
 
 	// Native A/B (systemd-sysupdate) System Updates group - built hidden,
@@ -851,4 +871,66 @@ func (uh *UserHome) updateHomebrew(button gtk.Button, gate *actionstate.Gate) {
 			})
 		}
 	})
+}
+
+// loadBootcRollbackStatus reveals the Roll Back row when bootc records a
+// rollback deployment. A host with no previous image — a fresh install, or
+// one whose rollback slot has been pruned — leaves the row hidden rather
+// than showing an inert control.
+func (uh *UserHome) loadBootcRollbackStatus() {
+	ctx, cancel := bootc.DefaultContext()
+	defer cancel()
+
+	status, err := bootc.GetStatus(ctx)
+
+	sgtk.RunOnMainThread(func() {
+		if uh.bootcRollbackRow == nil {
+			return
+		}
+		if err != nil || status.Status.Rollback == nil {
+			uh.bootcRollbackRow.SetVisible(false)
+			return
+		}
+
+		deployment := status.Status.Rollback
+		presentation := pageview.BootcRollbackRow(deployment.Version(), deployment.Timestamp())
+		uh.bootcRollbackRow.SetSubtitle(presentation.Subtitle)
+		uh.bootcRollbackRow.SetVisible(true)
+		log.Printf("views: bootc rollback available version=%q", deployment.Version())
+	})
+}
+
+// onBootcRollbackClicked stages a rollback to the previous deployment. It
+// does not restart: rolling back and restarting are separate decisions.
+func (uh *UserHome) onBootcRollbackClicked() {
+	if !uh.bootcRollbackGate.TryStart() {
+		return
+	}
+
+	button := uh.bootcRollbackBtn
+	row := uh.bootcRollbackRow
+	button.SetSensitive(false)
+
+	go func() {
+		ctx, cancel := ublue.DefaultContext()
+		defer cancel()
+
+		err := ublue.Rollback(ctx)
+
+		sgtk.RunOnMainThread(func() {
+			uh.bootcRollbackGate.Complete()
+			button.SetSensitive(true)
+
+			if err != nil {
+				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Rollback failed: %v", err))
+				return
+			}
+
+			decision := actionmsg.Rollback(ublue.IsDryRun())
+			if decision.Confirm {
+				row.SetSubtitle(pageview.BootcRollbackResultSubtitle())
+			}
+			uh.toastAdder.ShowToast(decision.Toast)
+		})
+	}()
 }

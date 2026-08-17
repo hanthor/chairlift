@@ -266,6 +266,14 @@ func Restart(ctx context.Context) error {
 	return err
 }
 
+// Rollback makes the previous deployment the default for the next boot. It
+// does not restart the machine; Restart is a separate, separately confirmed
+// action.
+func Rollback(ctx context.Context) error {
+	_, _, err := runHelper(ctx, pkexecCommand, ubluehelper.CommandRollback)
+	return err
+}
+
 // runHelper executes HelperPath via pkexec for privileged operations.
 // pkexecPath is the pkexec binary to invoke — always pkexecCommand in
 // production, but an explicit parameter (mirroring internal/updex.runHelper

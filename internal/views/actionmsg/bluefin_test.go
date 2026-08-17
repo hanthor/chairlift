@@ -96,3 +96,25 @@ func TestGamingModeConfirmsOnlyWhenSomethingChanged(t *testing.T) {
 		})
 	}
 }
+
+// Under dry-run nothing was reordered, so the row must not claim the
+// previous image will boot next.
+func TestRollbackNeverConfirmsUnderDryRun(t *testing.T) {
+	decision := Rollback(true)
+	if decision.Confirm {
+		t.Error("Rollback(true).Confirm = true, want false")
+	}
+	if !strings.Contains(decision.Toast, "[DRY-RUN]") {
+		t.Errorf("Rollback(true).Toast = %q, want a dry-run preview", decision.Toast)
+	}
+}
+
+func TestRollbackLiveToastAsksForARestart(t *testing.T) {
+	decision := Rollback(false)
+	if !decision.Confirm {
+		t.Error("Rollback(false).Confirm = false, want true")
+	}
+	if !strings.Contains(decision.Toast, "Restart") {
+		t.Errorf("Rollback(false).Toast = %q, want it to ask for a restart", decision.Toast)
+	}
+}

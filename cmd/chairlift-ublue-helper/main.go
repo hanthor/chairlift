@@ -57,6 +57,8 @@ func main() {
 		runDevGroups(ctx, invocation)
 	case ubluehelper.CommandRestart:
 		runRestart(ctx, invocation)
+	case ubluehelper.CommandRollback:
+		runRollback(ctx, invocation)
 	}
 }
 
@@ -145,6 +147,23 @@ func runRestart(ctx context.Context, invocation ubluehelper.Invocation) {
 	if err := run(ctx, "systemctl", args...); err != nil {
 		fatal(fmt.Sprintf("restart failed: %v", err))
 	}
+}
+
+// runRollback makes the previous deployment the default for the next boot.
+// It does not restart: rolling back and restarting are separate decisions,
+// and a user who rolls back may want to finish what they were doing first.
+func runRollback(ctx context.Context, invocation ubluehelper.Invocation) {
+	args := ubluehelper.RollbackArgs()
+
+	if invocation.DryRun {
+		fmt.Printf("[DRY-RUN] would execute: bootc %v\n", args)
+		return
+	}
+
+	if err := run(ctx, "bootc", args...); err != nil {
+		fatal(fmt.Sprintf("rollback failed: %v", err))
+	}
+	fmt.Println("rolled back — restart to boot the previous image")
 }
 
 // run executes one privileged command, forwarding its output so the calling

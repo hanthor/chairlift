@@ -39,6 +39,7 @@ const (
 	CommandDXEnable      = "dx-enable"
 	CommandDXDisable     = "dx-disable"
 	CommandRestart       = "restart"
+	CommandRollback      = "rollback"
 )
 
 // The channel words accepted as channel-switch's second argument. They are
@@ -71,7 +72,7 @@ type Invocation struct {
 // returned slice is a fresh value so callers cannot mutate the package's
 // command surface.
 func SupportedCommands() []string {
-	return []string{CommandChannelSwitch, CommandDXEnable, CommandDXDisable, CommandRestart}
+	return []string{CommandChannelSwitch, CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback}
 }
 
 // ParseInvocation accepts only the three argv shapes ChairLift emits:
@@ -80,6 +81,7 @@ func SupportedCommands() []string {
 //	dx-enable [--dry-run]
 //	dx-disable [--dry-run]
 //	restart [--dry-run]
+//	rollback [--dry-run]
 //
 // Everything else — extra arguments, a misplaced flag, an unknown channel
 // word, an unknown command — is rejected.
@@ -105,7 +107,7 @@ func ParseInvocation(args []string) (Invocation, error) {
 		}
 		return Invocation{Command: CommandChannelSwitch, Channel: channel, DryRun: dryRun}, nil
 
-	case CommandDXEnable, CommandDXDisable, CommandRestart:
+	case CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback:
 		if len(args) > 2 || (len(args) == 2 && args[1] != "--dry-run") {
 			return Invocation{}, fmt.Errorf("usage: chairlift-ublue-helper %s [--dry-run]", args[0])
 		}
@@ -141,6 +143,18 @@ func parseChannel(word string) (imageinfo.Channel, bool) {
 // would control.
 func RestartArgs() []string {
 	return []string{"reboot"}
+}
+
+// RollbackArgs returns the `bootc` argv that makes the previous deployment
+// the default for the next boot.
+//
+// Like RestartArgs it takes no caller-supplied value: `bootc rollback`
+// operates on the rollback deployment the host already records, so there is
+// no target for a caller to influence. Rolling back to an arbitrary earlier
+// image is a different operation — it is a switch to a pinned reference, and
+// belongs to the channel-switch action's validation, not here.
+func RollbackArgs() []string {
+	return []string{"rollback"}
 }
 
 // SwitchArgs returns the complete `bootc` argv for switching this host to

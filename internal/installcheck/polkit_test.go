@@ -167,6 +167,7 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 		ubluehelper.CommandDXEnable,
 		ubluehelper.CommandDXDisable,
 		ubluehelper.CommandRestart,
+		ubluehelper.CommandRollback,
 	}
 	if !reflect.DeepEqual(ublueCommands, expectedUblueCommands) {
 		t.Fatalf("ubluehelper.SupportedCommands() = %v, want %v", ublueCommands, expectedUblueCommands)
@@ -200,6 +201,13 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 			Message:     "Authentication is required to restart the system",
 			Path:        ublue.HelperPath,
 			Argv1:       ubluehelper.CommandRestart,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.rollback",
+			Description: "Roll back to the previous system image",
+			Message:     "Authentication is required to roll back to the previous system image",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandRollback,
 		},
 	})
 
