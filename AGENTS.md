@@ -248,6 +248,18 @@ An agent must not break these:
   Update All's completion, because it is the one action long enough a user may
   have stepped away. A toggle or switch completes in view and already has a
   toast; do not add a second notification for the same instant event.
+- **Powerwash and Factory Reset are opt-in and always confirmed.**
+  `reset_group` (maintenance_page) ships `enabled: false` in config.yml, the
+  same default as `maintenance_cleanup_group`, because both actions are
+  irreversible. Neither may run without the `AdwAlertDialog` confirmation in
+  `internal/views/reset.go` first — that dialog's title and body come from
+  `pageview.PowerwashConfirmation`/`FactoryResetConfirmation`, which is where
+  the `--experimental` disclosure for Factory Reset's `bootc install reset`
+  argv lives; do not move that text inline where it stops being tested.
+  Powerwash needs no privilege (both steps run in the invoking account, like
+  gaming mode); Factory Reset is the new `factory-reset` action on
+  `chairlift-ublue-helper` and takes no argument, since it has exactly one
+  target — the image already booted.
 
 ## Documentation
 

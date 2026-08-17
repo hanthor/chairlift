@@ -71,6 +71,16 @@ func TestParseInvocationAcceptsSupportedShapes(t *testing.T) {
 			want: Invocation{Command: CommandRollback, DryRun: true},
 		},
 		{
+			name: "factory reset",
+			args: []string{"factory-reset"},
+			want: Invocation{Command: CommandFactoryReset},
+		},
+		{
+			name: "factory reset dry run",
+			args: []string{"factory-reset", "--dry-run"},
+			want: Invocation{Command: CommandFactoryReset, DryRun: true},
+		},
+		{
 			name: "automatic updates on",
 			args: []string{"auto-updates-enable"},
 			want: Invocation{Command: CommandAutoEnable},
@@ -147,6 +157,8 @@ func TestParseInvocationRejectsEveryUnsupportedShape(t *testing.T) {
 		{name: "rollback with a target image", args: []string{"rollback", "ghcr.io/evil/image:old"}},
 		{name: "rollback with a deployment index", args: []string{"rollback", "1"}},
 		{name: "rollback with extra argument", args: []string{"rollback", "--dry-run", "1"}},
+		{name: "factory reset with a flag", args: []string{"factory-reset", "--force"}},
+		{name: "factory reset with extra argument", args: []string{"factory-reset", "--dry-run", "now"}},
 		// A caller-supplied unit would let an authenticated user enable or
 		// mask any systemd unit on the machine.
 		{name: "auto updates with a unit name", args: []string{"auto-updates-enable", "sshd.service"}},
@@ -186,6 +198,7 @@ func TestSupportedCommandsMatchesParser(t *testing.T) {
 		CommandAutoEnable,
 		CommandAutoDisable,
 		CommandDriverSwitch,
+		CommandFactoryReset,
 	}
 	if !reflect.DeepEqual(commands, want) {
 		t.Fatalf("SupportedCommands() = %v, want %v", commands, want)
@@ -295,6 +308,35 @@ func TestRestartArgsTakeNoCallerControlledValues(t *testing.T) {
 		if strings.HasPrefix(arg, "-") || strings.Contains(arg, ":") || strings.Contains(arg, "/") {
 			t.Errorf("RestartArgs() carries %q; the restart argv must be fixed", arg)
 		}
+	}
+}
+
+// FactoryResetArgs is the one helper argv that legitimately carries flags —
+// --experimental and --apply are fixed, not caller-supplied, so they are not
+// the caller-controlled-value risk the other Args functions guard against.
+// What must still never appear is a registry reference or an image path,
+// since a factory reset takes exactly one target: the image already booted.
+func TestFactoryResetArgsAreFixedAndCarryNoTarget(t *testing.T) {
+	args := FactoryResetArgs()
+	want := []string{"install", "reset", "--experimental", "--apply"}
+	if !reflect.DeepEqual(args, want) {
+		t.Fatalf("FactoryResetArgs() = %v, want %v", args, want)
+	}
+	for _, arg := range args {
+		if strings.Contains(arg, "/") || strings.Contains(arg, ":") {
+			t.Errorf("FactoryResetArgs() carries %q; a factory reset must not name a target", arg)
+		}
+	}
+	// bootc itself requires --experimental for this reset path; ChairLift
+	// must not hide that behind a shorter, friendlier-looking argv.
+	found := false
+	for _, arg := range args {
+		if arg == "--experimental" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("FactoryResetArgs() does not carry --experimental")
 	}
 }
 

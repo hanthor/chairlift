@@ -44,6 +44,7 @@ const (
 	CommandAutoEnable    = "auto-updates-enable"
 	CommandAutoDisable   = "auto-updates-disable"
 	CommandDriverSwitch  = "driver-switch"
+	CommandFactoryReset  = "factory-reset"
 )
 
 // The channel words accepted as channel-switch's second argument. They are
@@ -86,6 +87,7 @@ func SupportedCommands() []string {
 		CommandAutoEnable,
 		CommandAutoDisable,
 		CommandDriverSwitch,
+		CommandFactoryReset,
 	}
 }
 
@@ -99,6 +101,7 @@ func SupportedCommands() []string {
 //	auto-updates-enable [--dry-run]
 //	auto-updates-disable [--dry-run]
 //	driver-switch <standard|nvidia|nvidia-open> [--dry-run]
+//	factory-reset [--dry-run]
 //
 // Everything else — extra arguments, a misplaced flag, an unknown channel
 // word, an unknown command — is rejected.
@@ -141,7 +144,7 @@ func ParseInvocation(args []string) (Invocation, error) {
 		return Invocation{Command: CommandDriverSwitch, Driver: driver, DryRun: dryRun}, nil
 
 	case CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback,
-		CommandAutoEnable, CommandAutoDisable:
+		CommandAutoEnable, CommandAutoDisable, CommandFactoryReset:
 		if len(args) > 2 || (len(args) == 2 && args[1] != "--dry-run") {
 			return Invocation{}, fmt.Errorf("usage: chairlift-ublue-helper %s [--dry-run]", args[0])
 		}
@@ -222,6 +225,23 @@ func DriverSwitchArgs(info imageinfo.Info, driver imageinfo.Driver) ([]string, b
 // belongs to the channel-switch action's validation, not here.
 func RollbackArgs() []string {
 	return []string{"rollback"}
+}
+
+// FactoryResetArgs returns the argv that replaces the running deployment
+// with a fresh install of the same image, discarding every local change:
+// `bootc install reset`.
+//
+// `--experimental` is required by bootc itself — this reset path is not
+// stabilized upstream — and ChairLift does not hide that from the argv or
+// from the confirmation dialog that must be shown before this ever runs
+// (pageview.FactoryResetConfirmation). `--apply` makes the reset take effect
+// immediately rather than only staging it, because a "staged" factory reset
+// that silently applies at the next unrelated restart is a worse surprise
+// than the operation itself. Like Restart and Rollback this takes no
+// caller-supplied value: a factory reset has exactly one target, the image
+// already booted.
+func FactoryResetArgs() []string {
+	return []string{"install", "reset", "--experimental", "--apply"}
 }
 
 // AutoUpdateArgs returns the ordered systemctl argv lists that turn automatic

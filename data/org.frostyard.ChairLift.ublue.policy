@@ -104,4 +104,16 @@
     <annotate key="org.freedesktop.policykit.exec.argv1">driver-switch</annotate>
   </action>
 
+  <action id="org.frostyard.ChairLift.ublue.factory-reset">
+    <description>Factory reset the system</description>
+    <message>Authentication is required to factory reset the system</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">factory-reset</annotate>
+  </action>
+
 </policyconfig>

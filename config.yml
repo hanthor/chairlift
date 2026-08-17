@@ -70,6 +70,11 @@ maintenance_page:
     enabled: true
   maintenance_optimization_group:
     enabled: true
+  # Powerwash (remove every user Flatpak and Distrobox container) and Factory
+  # Reset (bootc install reset --experimental). Both are irreversible, so
+  # they ship disabled — the same default as maintenance_cleanup_group.
+  reset_group:
+    enabled: false
 
 features_page:
   features_group:

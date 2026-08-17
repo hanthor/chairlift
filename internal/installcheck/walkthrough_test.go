@@ -170,6 +170,7 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 		"maintenance_brew_group":         "Homebrew and Flatpak cleanup",
 		"maintenance_flatpak_group":      "Homebrew and Flatpak cleanup",
 		"maintenance_optimization_group": "Homebrew and Flatpak cleanup",
+		"reset_group":                    "Powerwash",
 		// features_page
 		"features_group": "updex",
 		"dx_group":       "Developer Mode",

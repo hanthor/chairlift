@@ -281,6 +281,11 @@ func defaultConfig() *Config {
 			"maintenance_brew_group":         GroupConfig{Enabled: true},
 			"maintenance_flatpak_group":      GroupConfig{Enabled: true},
 			"maintenance_optimization_group": GroupConfig{Enabled: true},
+			// Powerwash and Factory Reset. Disabled by default, the same as
+			// maintenance_cleanup_group: both are irreversible, so an
+			// administrator opts in explicitly rather than exposing them on
+			// every install.
+			"reset_group": GroupConfig{Enabled: false},
 		},
 		FeaturesPage: PageConfig{
 			"features_group": GroupConfig{Enabled: true},

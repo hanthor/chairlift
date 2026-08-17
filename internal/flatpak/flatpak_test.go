@@ -163,6 +163,7 @@ esac`
 			want: []string{"info", "--show-metadata", "--user", "org.mozilla.firefox"},
 		},
 		{name: "remove unused", run: func() error { _, err := UninstallUnused(); return err }, want: []string{"uninstall", "--unused", "-y"}},
+		{name: "remove all user apps", run: RemoveAllUser, want: []string{"uninstall", "--user", "--all", "-y"}},
 	}
 
 	for _, tt := range tests {

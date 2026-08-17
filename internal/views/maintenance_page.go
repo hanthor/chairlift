@@ -161,6 +161,12 @@ func (uh *UserHome) buildMaintenancePage() {
 
 		page.Add(group)
 	}
+
+	// Reset group: irreversible actions, disabled by default in config.yml —
+	// see reset.go.
+	if uh.config.IsGroupEnabled("maintenance_page", "reset_group") {
+		uh.buildResetGroup(page)
+	}
 }
 
 // onBrewCleanupClicked handles the Homebrew cleanup button click

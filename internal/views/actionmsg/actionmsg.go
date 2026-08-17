@@ -459,6 +459,47 @@ func Rollback(dryRun bool) FeatureToggleDecision {
 	}
 }
 
+// FactoryReset decides whether the factory-reset row should adopt its
+// applied subtitle, and what toast to show. Confirm is exactly !dryRun, the
+// same reasoning as Rollback: under dry-run nothing was staged.
+func FactoryReset(dryRun bool) FeatureToggleDecision {
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   "[DRY-RUN] Preview: would factory reset this system — no changes made",
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   "Factory reset applied. Restart to complete it.",
+	}
+}
+
+// Powerwash decides whether the Powerwash row should show its outcome, and
+// what toast to display. Unlike Rollback and FactoryReset, Powerwash runs
+// two independent, unprivileged steps that can each succeed, fail, or be
+// skipped (a tool not installed), so Confirm is not simply !dryRun — a live
+// run in which nothing was actually removed must not claim success, the same
+// distinction internal/views/actionmsg.GamingMode already makes.
+func Powerwash(dryRun bool, succeeded, failed int) FeatureToggleDecision {
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   "[DRY-RUN] Preview: would remove your Flatpaks and Distrobox containers — no changes made",
+		}
+	}
+	switch {
+	case succeeded == 0 && failed == 0:
+		return FeatureToggleDecision{Confirm: true, Toast: "Nothing was installed to remove."}
+	case failed > 0 && succeeded == 0:
+		return FeatureToggleDecision{Confirm: false, Toast: "Powerwash failed — nothing was removed."}
+	case failed > 0:
+		return FeatureToggleDecision{Confirm: true, Toast: "Powerwash finished with problems."}
+	default:
+		return FeatureToggleDecision{Confirm: true, Toast: "Powerwash complete."}
+	}
+}
+
 // AutomaticUpdates decides whether the automatic-updates switch should adopt
 // its new state, and what toast to show. Confirm is exactly !dryRun: under
 // dry-run ublue.runHelper short-circuits before pkexec, so the timer was

@@ -63,6 +63,8 @@ func main() {
 		runAutoUpdates(ctx, invocation)
 	case ubluehelper.CommandDriverSwitch:
 		runDriverSwitch(ctx, invocation)
+	case ubluehelper.CommandFactoryReset:
+		runFactoryReset(ctx, invocation)
 	}
 }
 
@@ -194,6 +196,24 @@ func runRollback(ctx context.Context, invocation ubluehelper.Invocation) {
 		fatal(fmt.Sprintf("rollback failed: %v", err))
 	}
 	fmt.Println("rolled back — restart to boot the previous image")
+}
+
+// runFactoryReset replaces the running deployment with a fresh install of
+// the same image. It does not restart on its own — bootc's reset takes
+// effect at the next boot, and combining a factory reset with an
+// unrequested restart would compound one irreversible action with another.
+func runFactoryReset(ctx context.Context, invocation ubluehelper.Invocation) {
+	args := ubluehelper.FactoryResetArgs()
+
+	if invocation.DryRun {
+		fmt.Printf("[DRY-RUN] would execute: bootc %v\n", args)
+		return
+	}
+
+	if err := run(ctx, "bootc", args...); err != nil {
+		fatal(fmt.Sprintf("factory reset failed: %v", err))
+	}
+	fmt.Println("factory reset applied — restart to complete it")
 }
 
 // runAutoUpdates turns the unattended-update timer on or off. Each step must

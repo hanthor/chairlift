@@ -8,6 +8,7 @@ import (
 	"unsafe"
 
 	"github.com/frostyard/chairlift/internal/bootc"
+	"github.com/frostyard/chairlift/internal/distrobox"
 	"github.com/frostyard/chairlift/internal/flatpak"
 	"github.com/frostyard/chairlift/internal/homebrew"
 	"github.com/frostyard/chairlift/internal/imageinfo"
@@ -90,6 +91,7 @@ func New() *Application {
 			sysupdate.SetDryRun(true)
 			updex.SetDryRun(true)
 			ublue.SetDryRun(true)
+			distrobox.SetDryRun(true)
 			// Lets the screenshot walkthrough render the Bluefin-family
 			// rows on a host that is not a Bluefin system. This is a no-op
 			// in every ordinary build; see imageinfo_override.go.

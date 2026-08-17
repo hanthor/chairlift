@@ -486,3 +486,11 @@ func Info(appID string, user bool) (*ApplicationInfo, error) {
 func UninstallUnused() (string, error) {
 	return runFlatpakCommand("uninstall", "--unused", "-y")
 }
+
+// RemoveAllUser uninstalls every user-scope Flatpak application. It is
+// Powerwash's Flatpak step (internal/powerwash) — the entire point is
+// removing everything, so it takes no application ID, unlike Uninstall.
+func RemoveAllUser() error {
+	_, err := runFlatpakCommand("uninstall", "--user", "--all", "-y")
+	return err
+}

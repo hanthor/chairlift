@@ -169,3 +169,53 @@ func TestDriverSwitchLiveToastNamesTheImageAndRestart(t *testing.T) {
 		t.Errorf("DriverSwitch toast %q does not ask for a restart", decision.Toast)
 	}
 }
+
+func TestFactoryResetNeverConfirmsUnderDryRun(t *testing.T) {
+	decision := FactoryReset(true)
+	if decision.Confirm {
+		t.Error("FactoryReset(true).Confirm = true, want false")
+	}
+	if !strings.Contains(decision.Toast, "[DRY-RUN]") {
+		t.Errorf("FactoryReset(true).Toast = %q, want a dry-run preview", decision.Toast)
+	}
+}
+
+func TestFactoryResetLiveToastAsksForARestart(t *testing.T) {
+	decision := FactoryReset(false)
+	if !decision.Confirm {
+		t.Error("FactoryReset(false).Confirm = false, want true")
+	}
+	if !strings.Contains(decision.Toast, "Restart") {
+		t.Errorf("FactoryReset(false).Toast = %q, want it to ask for a restart", decision.Toast)
+	}
+}
+
+func TestPowerwashConfirmsOnlyWhenSomethingWasRemoved(t *testing.T) {
+	tests := []struct {
+		name        string
+		dryRun      bool
+		succeeded   int
+		failed      int
+		wantConfirm bool
+		wantToast   string
+	}{
+		{name: "dry run", dryRun: true, wantToast: "[DRY-RUN]"},
+		{name: "both succeeded", succeeded: 2, wantConfirm: true, wantToast: "complete"},
+		{name: "nothing installed", wantConfirm: true, wantToast: "Nothing was installed"},
+		{name: "one failed, one succeeded", succeeded: 1, failed: 1, wantConfirm: true, wantToast: "problems"},
+		{name: "total failure does not confirm", failed: 2, wantConfirm: false, wantToast: "nothing was removed"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			decision := Powerwash(test.dryRun, test.succeeded, test.failed)
+			if decision.Confirm != test.wantConfirm {
+				t.Errorf("Powerwash(%v, %d, %d).Confirm = %v, want %v",
+					test.dryRun, test.succeeded, test.failed, decision.Confirm, test.wantConfirm)
+			}
+			if !strings.Contains(decision.Toast, test.wantToast) {
+				t.Errorf("Powerwash(...).Toast = %q, want it to contain %q", decision.Toast, test.wantToast)
+			}
+		})
+	}
+}

@@ -171,6 +171,7 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 		ubluehelper.CommandAutoEnable,
 		ubluehelper.CommandAutoDisable,
 		ubluehelper.CommandDriverSwitch,
+		ubluehelper.CommandFactoryReset,
 	}
 	if !reflect.DeepEqual(ublueCommands, expectedUblueCommands) {
 		t.Fatalf("ubluehelper.SupportedCommands() = %v, want %v", ublueCommands, expectedUblueCommands)
@@ -232,6 +233,13 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 			Message:     "Authentication is required to switch the system graphics driver image",
 			Path:        ublue.HelperPath,
 			Argv1:       ubluehelper.CommandDriverSwitch,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.factory-reset",
+			Description: "Factory reset the system",
+			Message:     "Authentication is required to factory reset the system",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandFactoryReset,
 		},
 	})
 

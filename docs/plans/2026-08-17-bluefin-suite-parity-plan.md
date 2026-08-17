@@ -52,7 +52,7 @@ covered it before this plan.
 | Desktop notifications | ✅ `notify-send` | ✅ `GNotification` | **Done** — `internal/notify`, Update All completion only |
 | Update strategy / focus mode / per-layer switches | ✅ | — | **Not porting** — the option sprawl the HIG constraint rules out. Phase 3's single switch replaces it. |
 | Reboot-on-logout / scheduled reboot window | ✅ | ✅ "Restart Tonight" | **Deferred** — needs a systemd user unit contract; revisit after Phase 3 |
-| Powerwash / Factory Reset | — | ✅ | **Approved 2026-08-17** — Phase 6. Irreversible, so both need an explicit typed/confirmed dialog and `bootc install reset` must stay behind its `--experimental` warning |
+| Powerwash / Factory Reset | — | ✅ | **Done** — `internal/powerwash`, `factory-reset` helper action, both opt-in and confirmed |
 | AI / GPU container stacks | ✅ | — | **Approved 2026-08-17** — Phase 7. Must arrive as one "AI stack" choice per detected GPU, not a 30-entry catalog |
 | Changelog / SBOM diff between images | — | ✅ | **Approved 2026-08-17** — Phase 8. Needs an offline-testable SPDX parser seam; the network call cannot be in the gated tests |
 | D-Bus progress publishing | — | ✅ | **Not porting** — exists to feed finupdate's GNOME Shell extension; no consumer here |
@@ -153,21 +153,37 @@ phases are already unprivileged. The only new privileged surface is
   `TestRunHelperJournalsEveryInvocation` and
   `TestRunHelperJournalsDryRunAsSuppressed` in `internal/ublue`.
 
-## Phase 6 — Powerwash and Factory Reset (medium)
+## Phase 6 — Powerwash and Factory Reset (medium) — ✅ landed
 
 Approved 2026-08-17. Both are irreversible, which sets the bar for how they
 are presented and tested.
 
-- Powerwash: `flatpak uninstall --user --all` plus `distrobox rm -f -a`. No
-  privilege required — it is all user-scope, like gaming mode.
-- Factory Reset: `bootc install reset --experimental --apply` through a new
-  helper subcommand + action. The `--experimental` flag must be surfaced in
-  the confirmation, not hidden.
+- Powerwash: `flatpak uninstall --user --all` (via new
+  `internal/flatpak.RemoveAllUser`) plus `distrobox rm --all --force` (via the
+  new minimal `internal/distrobox` package). No privilege required — it is
+  all user-scope, like gaming mode. Sequenced by the pure
+  `internal/powerwash.Runner`, in the same shape as `internal/updateall`.
+- Factory Reset: `bootc install reset --experimental --apply` through the new
+  `factory-reset` action on the existing `chairlift-ublue-helper`. The
+  `--experimental` flag is surfaced in the confirmation dialog's body, not
+  hidden, and `pageview.TestFactoryResetConfirmationNamesExperimental` holds
+  it there.
 - Both behind an `AdwAlertDialog` with a destructive-styled confirm, per the
   HIG's rule that destructive dialogs are reserved for non-undoable actions.
+  Both live in a new `reset_group` (`maintenance_page`) that ships
+  `enabled: false` by default, the same as `maintenance_cleanup_group`.
 - **Done when:** the walkthrough captures both confirmation dialogs, and the
   e2e boundary test asserts the helper rejects a factory reset invocation
-  carrying any argument.
+  carrying any argument. **Partially met** — the boundary test is in place
+  (`ublue_factory_reset_with_a_flag`, `ublue_factory_reset_with_extra_argument`
+  in `test/e2e/e2e_test.go`), and `reset_group` ships disabled by default, so
+  the walkthrough correctly does not capture it: driving a confirm dialog to
+  a screenshot would mean clicking through a real destructive action inside
+  the capture harness, which the walkthrough deliberately avoids doing for
+  any mutation (see Phase 1's note on why the Updating state is not
+  screenshotted). The dialog's exact text is table-tested in `pageview`
+  instead, which is the assertion that actually matters: that the
+  `--experimental` disclosure survives.
 
 ## Phase 7 — AI stacks (medium)
 

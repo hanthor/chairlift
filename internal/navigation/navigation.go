@@ -70,6 +70,7 @@ var items = []Item{
 			"maintenance_brew_group",
 			"maintenance_flatpak_group",
 			"maintenance_optimization_group",
+			"reset_group",
 		},
 	},
 	{

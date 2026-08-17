@@ -459,3 +459,53 @@ func GraphicsDriverRow(current, hardware, recommended string) Row {
 func GraphicsDriverResultSubtitle(driver string) string {
 	return fmt.Sprintf("Switched to the %s image — restart to apply", driver)
 }
+
+// PowerwashRow returns the Powerwash row text. summary comes from
+// internal/powerwash.Summarize's Headline once a run has completed, or "" if
+// no run has happened yet.
+func PowerwashRow(summary string) Row {
+	if summary == "" {
+		return Row{
+			Title:    "Remove Everything I Installed",
+			Subtitle: "Removes every user Flatpak and Distrobox container. Does not touch the system image.",
+		}
+	}
+	return Row{Title: "Remove Everything I Installed", Subtitle: summary}
+}
+
+// PowerwashConfirmation returns the title and body of the confirmation
+// dialog Powerwash must show before it runs, since removing every installed
+// application and container cannot be undone from within ChairLift.
+func PowerwashConfirmation() (title, body string) {
+	return "Remove Everything I Installed?",
+		"This removes every Flatpak application and every Distrobox container " +
+			"for your account. It does not touch the system image or your files. " +
+			"This cannot be undone."
+}
+
+// FactoryResetRow returns the Factory Reset row text.
+func FactoryResetRow() Row {
+	return Row{
+		Title:    "Factory Reset",
+		Subtitle: "Replaces the system with a fresh install of the current image, discarding local changes",
+	}
+}
+
+// FactoryResetConfirmation returns the title and body of the confirmation
+// dialog Factory Reset must show before it runs. The body names
+// --experimental explicitly — bootc's own reset path is not stabilized
+// upstream, and a confirmation that omitted that fact would be hiding the
+// one piece of information most likely to change a user's mind.
+func FactoryResetConfirmation() (title, body string) {
+	return "Factory Reset This System?",
+		"This discards every local change and reinstalls the current system " +
+			"image from scratch, using bootc's --experimental reset path. " +
+			"Your applications and home directory are not touched, but this " +
+			"cannot be undone. The reset applies at the next restart."
+}
+
+// FactoryResetResultSubtitle returns the subtitle after a factory reset is
+// applied. Like a channel switch it only stages the change.
+func FactoryResetResultSubtitle() string {
+	return "Factory reset applied — restart to complete it"
+}

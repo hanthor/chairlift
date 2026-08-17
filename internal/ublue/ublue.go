@@ -295,6 +295,16 @@ func Rollback(ctx context.Context) error {
 	return err
 }
 
+// FactoryReset replaces the running deployment with a fresh install of the
+// same image, discarding every local change. It is irreversible: callers
+// must confirm with the user before reaching this — see
+// pageview.FactoryResetConfirmation — because there is nothing this function
+// or the privileged helper behind it can undo once bootc applies the reset.
+func FactoryReset(ctx context.Context) error {
+	_, _, err := runHelper(ctx, pkexecCommand, ubluehelper.CommandFactoryReset)
+	return err
+}
+
 // SetAutomaticUpdates turns unattended background updates on or off.
 func SetAutomaticUpdates(ctx context.Context, enabled bool) error {
 	command := ubluehelper.CommandAutoDisable

@@ -1183,6 +1183,33 @@ away before it finished; every other toggle completes in view and already has
 a toast, so a second notification there would be noise the simple-interface
 constraint rules out.
 
+### Powerwash and Factory Reset
+
+`internal/powerwash` is Powerwash's pure sequencer, in the same shape as
+`internal/updateall`: `Runner.Run` executes the two steps (removing every
+user-scope Flatpak, removing every Distrobox container) through function
+seams, and `Summarize` aggregates the outcome. A step whose tool is not
+installed is `OutcomeSkipped`, not a failure — there is nothing for it to
+remove. Both steps are unprivileged; `internal/flatpak.RemoveAllUser` and the
+new `internal/distrobox` package (a minimal wrapper existing only to detect
+Distrobox and remove every container) are the real implementations.
+
+Factory Reset is `bootc install reset --experimental --apply`, dispatched
+through a new `factory-reset` action on the existing `chairlift-ublue-helper`
+— it takes no argument, since a factory reset has exactly one target, the
+image already booted.
+
+Both are gated by `maintenance_page`'s `reset_group`, which ships
+`enabled: false` in `config.yml` (the same default as
+`maintenance_cleanup_group`), and both require an `AdwAlertDialog`
+confirmation with a destructive-styled response before anything runs — the
+HIG's rule that destructive dialogs are reserved for genuinely non-undoable
+actions. The confirmation text lives in `pageview.PowerwashConfirmation` and
+`pageview.FactoryResetConfirmation`, table-tested to assert the Factory Reset
+body names `--experimental` explicitly: `bootc`'s own reset path is not
+stabilized upstream, and hiding that behind friendlier wording would be
+exactly the kind of detail a confirmation dialog exists to surface.
+
 ### Automatic background updates
 
 `internal/autoupdate` classifies the state of `uupd.timer`, the unit

@@ -111,6 +111,10 @@ type UserHome struct {
 	driverButton    *gtk.Button
 	driverGate      actionstate.Gate
 
+	// Powerwash / Factory Reset (maintenance_page reset_group)
+	powerwashGate    actionstate.Gate
+	factoryResetGate actionstate.Gate
+
 	// Features page references
 	featuresGroup            *adw.PreferencesGroup
 	featuresUnavailableGroup *adw.PreferencesGroup
