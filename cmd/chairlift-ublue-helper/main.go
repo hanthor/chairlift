@@ -59,6 +59,8 @@ func main() {
 		runRestart(ctx, invocation)
 	case ubluehelper.CommandRollback:
 		runRollback(ctx, invocation)
+	case ubluehelper.CommandAutoEnable, ubluehelper.CommandAutoDisable:
+		runAutoUpdates(ctx, invocation)
 	}
 }
 
@@ -164,6 +166,26 @@ func runRollback(ctx context.Context, invocation ubluehelper.Invocation) {
 		fatal(fmt.Sprintf("rollback failed: %v", err))
 	}
 	fmt.Println("rolled back — restart to boot the previous image")
+}
+
+// runAutoUpdates turns the unattended-update timer on or off. Each step must
+// succeed: a partial application would leave the timer in a state that does
+// not match what the user was shown.
+func runAutoUpdates(ctx context.Context, invocation ubluehelper.Invocation) {
+	steps, ok := ubluehelper.AutoUpdateArgs(invocation.Command)
+	if !ok {
+		fatal(fmt.Sprintf("unsupported automatic-update command %q", invocation.Command))
+	}
+
+	for _, args := range steps {
+		if invocation.DryRun {
+			fmt.Printf("[DRY-RUN] would execute: systemctl %v\n", args)
+			continue
+		}
+		if err := run(ctx, "systemctl", args...); err != nil {
+			fatal(fmt.Sprintf("systemctl %v failed: %v", args, err))
+		}
+	}
 }
 
 // run executes one privileged command, forwarding its output so the calling

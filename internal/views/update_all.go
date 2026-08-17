@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"log"
 
+	"time"
+
+	"github.com/frostyard/chairlift/internal/autoupdate"
 	"github.com/frostyard/chairlift/internal/bootc"
 	"github.com/frostyard/chairlift/internal/flatpak"
 	"github.com/frostyard/chairlift/internal/homebrew"
 	"github.com/frostyard/chairlift/internal/ublue"
 	"github.com/frostyard/chairlift/internal/updateall"
+	"github.com/frostyard/chairlift/internal/views/actionmsg"
 	"github.com/frostyard/chairlift/internal/views/pageview"
 
 	sgtk "github.com/frostyard/snowkit/gtk"
@@ -17,6 +21,11 @@ import (
 	"codeberg.org/puregotk/puregotk/v4/adw"
 	"codeberg.org/puregotk/puregotk/v4/gtk"
 )
+
+// autoUpdateProbeTimeout bounds the two unprivileged systemctl queries that
+// decide whether the automatic-updates switch is shown. It runs during page
+// construction, so it must not be able to stall the window.
+const autoUpdateProbeTimeout = 5 * time.Second
 
 // Update All is ChairLift's port of bluefinctl's `bctl update` and
 // finupdate's hero update button: one action that brings the OS image,
@@ -82,6 +91,11 @@ func (uh *UserHome) buildUpdateAllGroup(page *adw.PreferencesPage) {
 	restart.SetVisible(false)
 	group.Add(&restart.Widget)
 
+	// Automatic updates sit with Update All rather than in a group of their
+	// own: they answer the same question — how does this system get updated
+	// — and separating them would imply they are unrelated settings.
+	uh.buildAutomaticUpdatesRow(group)
+
 	page.Add(group)
 	uh.updateAllGroup = group
 	uh.updateAllRow = row
@@ -89,6 +103,76 @@ func (uh *UserHome) buildUpdateAllGroup(page *adw.PreferencesPage) {
 	uh.updateAllRestart = restart
 
 	log.Printf("views: update all group built phases=%d", len(plan))
+}
+
+// buildAutomaticUpdatesRow adds the automatic-background-updates switch. The
+// row is omitted entirely when the unattended-update timer is not installed,
+// so a host that cannot update itself never shows a switch that would do
+// nothing.
+func (uh *UserHome) buildAutomaticUpdatesRow(group *adw.PreferencesGroup) {
+	ctx, cancel := context.WithTimeout(context.Background(), autoUpdateProbeTimeout)
+	defer cancel()
+
+	state := autoupdate.Detect(ctx)
+	if !state.Available() {
+		log.Printf("views: automatic updates unavailable (%s not installed)", autoupdate.TimerUnit)
+		return
+	}
+
+	enabled := state.Enabled()
+	row := adw.NewActionRow()
+	presentation := pageview.AutomaticUpdatesRow(enabled)
+	row.SetTitle(presentation.Title)
+	row.SetSubtitle(presentation.Subtitle)
+
+	toggle := gtk.NewSwitch()
+	toggle.SetActive(enabled)
+	toggle.SetValign(gtk.AlignCenterValue)
+
+	sw := toggle
+	autoRow := row
+	stateSetCb := func(_ gtk.Switch, wanted bool) bool {
+		uh.onAutomaticUpdatesToggled(wanted, sw, autoRow)
+		return true // block the visual change until the switch is confirmed
+	}
+	toggle.ConnectStateSet(&stateSetCb)
+
+	row.AddSuffix(&toggle.Widget)
+	row.SetActivatableWidget(&toggle.Widget)
+	group.Add(&row.Widget)
+
+	uh.autoUpdatesRow = row
+	uh.autoUpdatesSwitch = toggle
+	log.Printf("views: automatic updates row built state=%s", state)
+}
+
+// onAutomaticUpdatesToggled turns unattended updates on or off.
+func (uh *UserHome) onAutomaticUpdatesToggled(enabled bool, toggle *gtk.Switch, row *adw.ActionRow) {
+	toggle.SetSensitive(false)
+
+	go func() {
+		ctx, cancel := ublue.DefaultContext()
+		defer cancel()
+
+		err := ublue.SetAutomaticUpdates(ctx, enabled)
+
+		sgtk.RunOnMainThread(func() {
+			toggle.SetSensitive(true)
+
+			if err != nil {
+				toggle.SetActive(!enabled)
+				uh.toastAdder.ShowErrorToast(fmt.Sprintf("Automatic updates: %v", err))
+				return
+			}
+
+			decision := actionmsg.AutomaticUpdates(ublue.IsDryRun(), enabled)
+			toggle.SetActive(decision.Confirm == enabled)
+			if decision.Confirm {
+				row.SetSubtitle(pageview.AutomaticUpdatesResultSubtitle(enabled))
+			}
+			uh.toastAdder.ShowToast(decision.Toast)
+		})
+	}()
 }
 
 // hostAvailability reports which providers this host can update. Each check

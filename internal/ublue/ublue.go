@@ -274,6 +274,16 @@ func Rollback(ctx context.Context) error {
 	return err
 }
 
+// SetAutomaticUpdates turns unattended background updates on or off.
+func SetAutomaticUpdates(ctx context.Context, enabled bool) error {
+	command := ubluehelper.CommandAutoDisable
+	if enabled {
+		command = ubluehelper.CommandAutoEnable
+	}
+	_, _, err := runHelper(ctx, pkexecCommand, command)
+	return err
+}
+
 // runHelper executes HelperPath via pkexec for privileged operations.
 // pkexecPath is the pkexec binary to invoke — always pkexecCommand in
 // production, but an explicit parameter (mirroring internal/updex.runHelper

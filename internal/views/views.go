@@ -72,6 +72,10 @@ type UserHome struct {
 	updateAllRestart *adw.ActionRow
 	updateAllGate    actionstate.Gate
 
+	// Automatic background updates
+	autoUpdatesRow    *adw.ActionRow
+	autoUpdatesSwitch *gtk.Switch
+
 	// bootc update references
 	bootcStageExpander *adw.ExpanderRow
 	bootcStageBtn      *gtk.Button

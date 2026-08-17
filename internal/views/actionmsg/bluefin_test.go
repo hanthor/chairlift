@@ -118,3 +118,31 @@ func TestRollbackLiveToastAsksForARestart(t *testing.T) {
 		t.Errorf("Rollback(false).Toast = %q, want it to ask for a restart", decision.Toast)
 	}
 }
+
+// Under dry-run the timer was never touched, so confirming would leave the
+// switch disagreeing with systemd.
+func TestAutomaticUpdatesNeverConfirmsUnderDryRun(t *testing.T) {
+	for _, enable := range []bool{true, false} {
+		decision := AutomaticUpdates(true, enable)
+		if decision.Confirm {
+			t.Errorf("AutomaticUpdates(true, %v).Confirm = true, want false", enable)
+		}
+		if !strings.Contains(decision.Toast, "[DRY-RUN]") {
+			t.Errorf("AutomaticUpdates(true, %v).Toast = %q, want a dry-run preview", enable, decision.Toast)
+		}
+	}
+}
+
+func TestAutomaticUpdatesLiveToastsNameTheDirection(t *testing.T) {
+	on := AutomaticUpdates(false, true)
+	off := AutomaticUpdates(false, false)
+
+	for _, decision := range []FeatureToggleDecision{on, off} {
+		if !decision.Confirm {
+			t.Error("AutomaticUpdates(false, _).Confirm = false, want true")
+		}
+	}
+	if !strings.Contains(on.Toast, "on") || !strings.Contains(off.Toast, "off") {
+		t.Errorf("AutomaticUpdates toasts do not name the direction: on=%q off=%q", on.Toast, off.Toast)
+	}
+}

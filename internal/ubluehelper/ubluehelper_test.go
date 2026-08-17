@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/frostyard/chairlift/internal/autoupdate"
 	"github.com/frostyard/chairlift/internal/imageinfo"
 )
 
@@ -69,6 +70,21 @@ func TestParseInvocationAcceptsSupportedShapes(t *testing.T) {
 			args: []string{"rollback", "--dry-run"},
 			want: Invocation{Command: CommandRollback, DryRun: true},
 		},
+		{
+			name: "automatic updates on",
+			args: []string{"auto-updates-enable"},
+			want: Invocation{Command: CommandAutoEnable},
+		},
+		{
+			name: "automatic updates off",
+			args: []string{"auto-updates-disable"},
+			want: Invocation{Command: CommandAutoDisable},
+		},
+		{
+			name: "automatic updates dry run",
+			args: []string{"auto-updates-enable", "--dry-run"},
+			want: Invocation{Command: CommandAutoEnable, DryRun: true},
+		},
 	}
 
 	for _, test := range tests {
@@ -116,6 +132,10 @@ func TestParseInvocationRejectsEveryUnsupportedShape(t *testing.T) {
 		{name: "rollback with a target image", args: []string{"rollback", "ghcr.io/evil/image:old"}},
 		{name: "rollback with a deployment index", args: []string{"rollback", "1"}},
 		{name: "rollback with extra argument", args: []string{"rollback", "--dry-run", "1"}},
+		// A caller-supplied unit would let an authenticated user enable or
+		// mask any systemd unit on the machine.
+		{name: "auto updates with a unit name", args: []string{"auto-updates-enable", "sshd.service"}},
+		{name: "auto updates with a flag", args: []string{"auto-updates-disable", "--now"}},
 		{name: "updex command is not accepted here", args: []string{"enable-feature", "demo"}},
 	}
 
@@ -134,7 +154,15 @@ func TestParseInvocationRejectsEveryUnsupportedShape(t *testing.T) {
 
 func TestSupportedCommandsMatchesParser(t *testing.T) {
 	commands := SupportedCommands()
-	want := []string{CommandChannelSwitch, CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback}
+	want := []string{
+		CommandChannelSwitch,
+		CommandDXEnable,
+		CommandDXDisable,
+		CommandRestart,
+		CommandRollback,
+		CommandAutoEnable,
+		CommandAutoDisable,
+	}
 	if !reflect.DeepEqual(commands, want) {
 		t.Fatalf("SupportedCommands() = %v, want %v", commands, want)
 	}
@@ -178,6 +206,68 @@ func TestRollbackArgsTakeNoCallerControlledValues(t *testing.T) {
 	for _, arg := range args {
 		if strings.HasPrefix(arg, "-") || strings.Contains(arg, "/") || strings.Contains(arg, ":") {
 			t.Errorf("RollbackArgs() carries %q; the rollback argv must be fixed", arg)
+		}
+	}
+}
+
+// "Off" has two on-disk representations, so enabling must unmask before it
+// enables — otherwise a machine ever set to bluefinctl's manual strategy or
+// focus mode would silently refuse to turn automatic updates back on.
+func TestAutoUpdateArgsHandleBothRepresentationsOfOff(t *testing.T) {
+	enable, ok := AutoUpdateArgs(CommandAutoEnable)
+	if !ok {
+		t.Fatal("AutoUpdateArgs(enable) ok = false, want true")
+	}
+	want := [][]string{
+		{"unmask", autoupdate.TimerUnit},
+		{"enable", "--now", autoupdate.TimerUnit},
+	}
+	if !reflect.DeepEqual(enable, want) {
+		t.Errorf("AutoUpdateArgs(enable) = %v, want %v", enable, want)
+	}
+
+	disable, ok := AutoUpdateArgs(CommandAutoDisable)
+	if !ok {
+		t.Fatal("AutoUpdateArgs(disable) ok = false, want true")
+	}
+	// Masking, not merely disabling, so a `systemctl preset` run during a
+	// package upgrade cannot quietly re-enable what the user turned off.
+	wantDisable := [][]string{
+		{"disable", "--now", autoupdate.TimerUnit},
+		{"mask", autoupdate.TimerUnit},
+	}
+	if !reflect.DeepEqual(disable, wantDisable) {
+		t.Errorf("AutoUpdateArgs(disable) = %v, want %v", disable, wantDisable)
+	}
+
+	for _, command := range []string{CommandRestart, CommandRollback, CommandChannelSwitch, "systemctl"} {
+		if _, ok := AutoUpdateArgs(command); ok {
+			t.Errorf("AutoUpdateArgs(%q) ok = true, want false", command)
+		}
+	}
+}
+
+// Every step must name only the unattended-update timer.
+func TestAutoUpdateArgsTouchOnlyTheUpdateTimer(t *testing.T) {
+	for _, command := range []string{CommandAutoEnable, CommandAutoDisable} {
+		steps, ok := AutoUpdateArgs(command)
+		if !ok {
+			t.Fatalf("AutoUpdateArgs(%q) ok = false", command)
+		}
+		for _, args := range steps {
+			named := false
+			for _, arg := range args {
+				if arg == autoupdate.TimerUnit {
+					named = true
+					continue
+				}
+				if strings.Contains(arg, ".service") || strings.Contains(arg, ".timer") {
+					t.Errorf("AutoUpdateArgs(%q) touches unit %q", command, arg)
+				}
+			}
+			if !named {
+				t.Errorf("AutoUpdateArgs(%q) step %v does not name %s", command, args, autoupdate.TimerUnit)
+			}
 		}
 	}
 }

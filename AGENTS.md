@@ -121,6 +121,15 @@ An agent must not break these:
   is true only when an image was genuinely staged — the stage script is
   idempotent and exits 0 on an already-current system, so a successful OS
   phase is not by itself evidence anything changed.
+- **New privileged operations extend the ublue helper; they do not add a
+  binary.** `chairlift-ublue-helper` now carries seven subcommands
+  (`channel-switch`, `dx-enable`, `dx-disable`, `restart`, `rollback`,
+  `auto-updates-enable`, `auto-updates-disable`), each selected by exactly one
+  PolicyKit action. Every one takes a fixed argv: no image reference, no
+  username, no systemd unit, no delay, and no rollback target crosses the
+  boundary, because each would be a value an authenticated caller controls.
+  `internal/ubluehelper`'s tests assert this per command, and the e2e boundary
+  test asserts the installed binary rejects each shape.
 - **OS staging execution has one owner.** `internal/stageexec` is the pure-Go
   leaf package that owns the progress event contract, merged stdout/stderr
   streaming, direct-child cancellation, error classification, completion event,

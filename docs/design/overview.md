@@ -1162,6 +1162,39 @@ fixed argv that takes no delay and no target. Scheduled restarts
 need their own action rather than a parameter here, precisely because a time
 argument crossing the boundary is another value the caller would control.
 
+### Automatic background updates
+
+`internal/autoupdate` classifies the state of `uupd.timer`, the unit
+Universal Blue images ship for unattended updates. It is read-only; the
+privileged writes are `auto-updates-enable` / `auto-updates-disable` on
+`chairlift-ublue-helper`.
+
+The package exists because ChairLift presents this as **one switch** where
+bluefinctl presents a strategy enum, a schedule picker, per-layer switches,
+and a focus mode. Collapsing several systemd states into a binary control is
+only safe if the mapping is explicit, which is what `Classify` is:
+
+- `is-enabled` returning `""` or `not-found` — the unit is not installed, so
+  `StateUnavailable`, and the switch is not shown at all.
+- `masked` or `masked-runtime` — `StateOff`, whatever `is-active` says. A
+  masked timer cannot run. This is also how bluefinctl's "manual" strategy
+  and its "focus mode" are both represented on disk, and neither is
+  distinguishable to a user who only wants to know whether the machine
+  updates itself.
+- `enabled`/`enabled-runtime` with an active timer — `StateOn`.
+- `enabled` with an inactive or failed timer — `StateOff`. An enabled but dead
+  timer updates nothing, and calling it on is a claim the user disproves only
+  by never receiving an update.
+- anything else (`disabled`, `static`, `indirect`) — `StateOff`.
+
+Turning the switch on unmasks before enabling, because "off" has those two
+on-disk representations and a machine ever set to manual would otherwise
+refuse to turn back on. Turning it off masks rather than merely disabling, so
+a `systemctl preset` run during a package upgrade cannot quietly re-enable
+what the user turned off. The unit name is fixed in the helper: a
+caller-supplied unit would let an authenticated user enable or mask anything
+on the machine.
+
 ### The release-channel table
 
 `internal/imageinfo` owns the mapping from a running image and tag to the tag

@@ -458,3 +458,25 @@ func Rollback(dryRun bool) FeatureToggleDecision {
 		Toast:   "Rolled back. Restart to boot the previous image.",
 	}
 }
+
+// AutomaticUpdates decides whether the automatic-updates switch should adopt
+// its new state, and what toast to show. Confirm is exactly !dryRun: under
+// dry-run ublue.runHelper short-circuits before pkexec, so the timer was
+// never touched and confirming would leave the switch disagreeing with
+// systemd.
+func AutomaticUpdates(dryRun bool, enable bool) FeatureToggleDecision {
+	verb := "off"
+	if enable {
+		verb = "on"
+	}
+	if dryRun {
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("[DRY-RUN] Preview: automatic updates would be turned %s — no changes made", verb),
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   fmt.Sprintf("Automatic updates turned %s.", verb),
+	}
+}

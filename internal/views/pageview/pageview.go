@@ -405,3 +405,27 @@ func BootcRollbackRow(version, timestamp string) Row {
 func BootcRollbackResultSubtitle() string {
 	return "Rolled back — restart to boot the previous image"
 }
+
+// AutomaticUpdatesRow returns the automatic-background-updates switch row
+// text. It is one row rather than bluefinctl's strategy picker, schedule
+// rows, and per-layer switches, so its subtitle has to carry what the switch
+// actually governs.
+func AutomaticUpdatesRow(enabled bool) Row {
+	row := Row{Title: "Automatic Updates"}
+	if enabled {
+		row.Subtitle = "This system installs updates in the background and applies them at restart"
+		return row
+	}
+	row.Subtitle = "Update this system only when you ask"
+	return row
+}
+
+// AutomaticUpdatesResultSubtitle returns the subtitle after the switch is
+// toggled. Turning automatic updates on does not update anything right now,
+// so neither outcome implies an immediate change.
+func AutomaticUpdatesResultSubtitle(enabled bool) string {
+	if enabled {
+		return "Automatic updates are on — the next check runs on the system's schedule"
+	}
+	return "Automatic updates are off — use Update All when you want to update"
+}

@@ -68,4 +68,28 @@
     <annotate key="org.freedesktop.policykit.exec.argv1">rollback</annotate>
   </action>
 
+  <action id="org.frostyard.ChairLift.ublue.auto-updates-enable">
+    <description>Enable automatic background updates</description>
+    <message>Authentication is required to enable automatic background updates</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">auto-updates-enable</annotate>
+  </action>
+
+  <action id="org.frostyard.ChairLift.ublue.auto-updates-disable">
+    <description>Disable automatic background updates</description>
+    <message>Authentication is required to disable automatic background updates</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/chairlift-ublue-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">auto-updates-disable</annotate>
+  </action>
+
 </policyconfig>

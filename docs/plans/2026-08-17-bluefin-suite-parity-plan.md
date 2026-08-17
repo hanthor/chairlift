@@ -41,7 +41,7 @@ covered it before this plan.
 | **Update All** (OS + Flatpak + Brew, one action) | ✅ `bctl update` | ✅ hero button | **Done** — `internal/updateall` |
 | Restart to apply / reboot prompt | ✅ | ✅ | **Done** — `restart` helper subcommand |
 | Rollback to previous deployment | ✅ calendar | ✅ | **Done** — `rollback` helper subcommand |
-| Automatic background updates (uupd timer) | ✅ | ✅ | **Phase 3** |
+| Automatic background updates (uupd timer) | ✅ | ✅ | **Done** — `internal/autoupdate`, one switch |
 | Image variant selection (`-nvidia`, `-dx`) | — | ✅ rebase dialog | **Phase 4** |
 | Pin to dated tag / unpin to stream | — | ✅ | **Phase 4** |
 | GPU detection | ✅ | ✅ | **Phase 4** (needed to offer the right variant) |
@@ -99,14 +99,18 @@ phases are already unprivileged. The only new privileged surface is
   version/timestamp matrix and by the boundary test asserting the helper
   rejects any caller-supplied rollback target.
 
-## Phase 3 — Automatic background updates (small)
+## Phase 3 — Automatic background updates (small) — ✅ landed
 
 - One switch: on/off, backed by `systemctl enable --now uupd.timer` /
   `disable` through a new helper subcommand + action.
 - Hidden entirely when `uupd` is absent, the same availability pattern as
   `updex` and the Bluefin-family groups.
 - **Done when:** the walkthrough captures the switch reflecting real timer
-  state, and the switch is absent on a host without `uupd`.
+  state, and the switch is absent on a host without `uupd`. **Met.** The
+  runner has no `uupd.timer`, so the walkthrough exercises both: unstubbed it
+  logs `automatic updates unavailable` and shows no switch, and with the
+  `chairlift_e2e`-tagged probe stub it captures the switch in its on state.
+  Every systemd state `Classify` can see is covered by its own table test.
 
 ## Phase 4 — Image variants (medium)
 

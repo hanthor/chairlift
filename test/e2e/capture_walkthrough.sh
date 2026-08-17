@@ -91,6 +91,12 @@ JSON
 fi
 export CHAIRLIFT_IMAGE_INFO
 
+# Render the automatic-updates switch even though the runner has no
+# uupd.timer, for the same reason. The value is the pair of systemctl answers
+# autoupdate.Classify consumes; "enabled,active" is the switch-on state.
+: "${CHAIRLIFT_AUTO_UPDATES:=enabled,active}"
+export CHAIRLIFT_AUTO_UPDATES
+
 dbus-run-session -- "$APP" --dry-run >>"$LOG" 2>&1 &
 APP_PID=$!
 

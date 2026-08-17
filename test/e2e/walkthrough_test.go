@@ -259,6 +259,15 @@ func assertUpdateAllRendered(t *testing.T, outDir string) {
 	if strings.Contains(line, "phases=0") {
 		t.Errorf("Update All rendered with an empty plan; the group should have been omitted entirely\n  %s", line)
 	}
+
+	// The automatic-updates switch shares the group. capture_walkthrough.sh
+	// supplies a stubbed systemd answer so the shown state is captured; the
+	// hidden state is what an unstubbed runner produces and is covered by
+	// internal/autoupdate's classification table.
+	autoLine := findLogLine(t, outDir, "views: automatic updates row built")
+	if !strings.Contains(autoLine, "state=on") {
+		t.Errorf("automatic updates row did not render in the on state\n  %s", autoLine)
+	}
 }
 
 // findLogLine returns the first line of the walkthrough's application log

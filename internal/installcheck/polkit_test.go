@@ -168,6 +168,8 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 		ubluehelper.CommandDXDisable,
 		ubluehelper.CommandRestart,
 		ubluehelper.CommandRollback,
+		ubluehelper.CommandAutoEnable,
+		ubluehelper.CommandAutoDisable,
 	}
 	if !reflect.DeepEqual(ublueCommands, expectedUblueCommands) {
 		t.Fatalf("ubluehelper.SupportedCommands() = %v, want %v", ublueCommands, expectedUblueCommands)
@@ -208,6 +210,20 @@ func TestPolkitPoliciesMatchPrivilegedHelpers(t *testing.T) {
 			Message:     "Authentication is required to roll back to the previous system image",
 			Path:        ublue.HelperPath,
 			Argv1:       ubluehelper.CommandRollback,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.auto-updates-enable",
+			Description: "Enable automatic background updates",
+			Message:     "Authentication is required to enable automatic background updates",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandAutoEnable,
+		},
+		{
+			ID:          "org.frostyard.ChairLift.ublue.auto-updates-disable",
+			Description: "Disable automatic background updates",
+			Message:     "Authentication is required to disable automatic background updates",
+			Path:        ublue.HelperPath,
+			Argv1:       ubluehelper.CommandAutoDisable,
 		},
 	})
 

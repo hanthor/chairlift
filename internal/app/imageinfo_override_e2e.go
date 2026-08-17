@@ -3,8 +3,11 @@
 package app
 
 import (
+	"context"
 	"os"
+	"strings"
 
+	"github.com/frostyard/chairlift/internal/autoupdate"
 	"github.com/frostyard/chairlift/internal/ublue"
 )
 
@@ -20,5 +23,15 @@ import (
 func applyImageInfoOverride() {
 	if path := os.Getenv("CHAIRLIFT_IMAGE_INFO"); path != "" {
 		ublue.SetDescriptorOverride(path)
+	}
+
+	// $CHAIRLIFT_AUTO_UPDATES is "<is-enabled>,<is-active>" — the two
+	// systemctl answers autoupdate.Classify consumes — so the walkthrough can
+	// capture the automatic-updates switch on a runner with no uupd.timer.
+	if spec := os.Getenv("CHAIRLIFT_AUTO_UPDATES"); spec != "" {
+		isEnabled, isActive, _ := strings.Cut(spec, ",")
+		autoupdate.SetProbe(func(context.Context) (string, string) {
+			return isEnabled, isActive
+		})
 	}
 }

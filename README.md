@@ -59,6 +59,13 @@ restart prompt. The prompt appears only when an OS image was actually staged,
 so a system that was already current never asks for a reboot. A phase that
 fails does not stop the others.
 
+### 🔁 Automatic Updates & Rollback
+
+- **Automatic Updates**: one switch for whether the system updates itself in
+  the background. Hidden on systems without the unattended-update timer
+- **Roll Back**: return to the previous system image at the next restart,
+  shown only when a previous image exists
+
 ### 🔧 Updates & Maintenance
 
 - **System Updates**: On bootc-based systems, download and stage the next OS image update (applied on restart) and view booted/staged/rollback deployment status; on native A/B (systemd-sysupdate) installs, stage the next image the same way and see the previous version available for boot-menu rollback

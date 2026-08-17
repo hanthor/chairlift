@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/frostyard/chairlift/internal/autoupdate"
 	"github.com/frostyard/chairlift/internal/imageinfo"
 )
 
@@ -40,6 +41,8 @@ const (
 	CommandDXDisable     = "dx-disable"
 	CommandRestart       = "restart"
 	CommandRollback      = "rollback"
+	CommandAutoEnable    = "auto-updates-enable"
+	CommandAutoDisable   = "auto-updates-disable"
 )
 
 // The channel words accepted as channel-switch's second argument. They are
@@ -72,7 +75,15 @@ type Invocation struct {
 // returned slice is a fresh value so callers cannot mutate the package's
 // command surface.
 func SupportedCommands() []string {
-	return []string{CommandChannelSwitch, CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback}
+	return []string{
+		CommandChannelSwitch,
+		CommandDXEnable,
+		CommandDXDisable,
+		CommandRestart,
+		CommandRollback,
+		CommandAutoEnable,
+		CommandAutoDisable,
+	}
 }
 
 // ParseInvocation accepts only the three argv shapes ChairLift emits:
@@ -82,6 +93,8 @@ func SupportedCommands() []string {
 //	dx-disable [--dry-run]
 //	restart [--dry-run]
 //	rollback [--dry-run]
+//	auto-updates-enable [--dry-run]
+//	auto-updates-disable [--dry-run]
 //
 // Everything else — extra arguments, a misplaced flag, an unknown channel
 // word, an unknown command — is rejected.
@@ -107,7 +120,8 @@ func ParseInvocation(args []string) (Invocation, error) {
 		}
 		return Invocation{Command: CommandChannelSwitch, Channel: channel, DryRun: dryRun}, nil
 
-	case CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback:
+	case CommandDXEnable, CommandDXDisable, CommandRestart, CommandRollback,
+		CommandAutoEnable, CommandAutoDisable:
 		if len(args) > 2 || (len(args) == 2 && args[1] != "--dry-run") {
 			return Invocation{}, fmt.Errorf("usage: chairlift-ublue-helper %s [--dry-run]", args[0])
 		}
@@ -155,6 +169,37 @@ func RestartArgs() []string {
 // belongs to the channel-switch action's validation, not here.
 func RollbackArgs() []string {
 	return []string{"rollback"}
+}
+
+// AutoUpdateArgs returns the ordered systemctl argv lists that turn automatic
+// background updates on or off. ok is false for any other command.
+//
+// Enabling takes two steps because "off" has two representations on disk: a
+// disabled timer and a masked one. bluefinctl's "manual" strategy and its
+// "focus mode" both mask the unit, so enabling must unmask before it can
+// enable, or a machine that had ever been set to manual would silently refuse
+// to turn automatic updates back on. Disabling masks rather than merely
+// disabling, so that a package upgrade re-running `systemctl preset` cannot
+// quietly re-enable something the user turned off.
+//
+// The unit name is fixed to autoupdate.TimerUnit rather than passed in: a
+// caller-supplied unit would let an authenticated user enable or mask any
+// systemd unit on the machine.
+func AutoUpdateArgs(command string) ([][]string, bool) {
+	switch command {
+	case CommandAutoEnable:
+		return [][]string{
+			{"unmask", autoupdate.TimerUnit},
+			{"enable", "--now", autoupdate.TimerUnit},
+		}, true
+	case CommandAutoDisable:
+		return [][]string{
+			{"disable", "--now", autoupdate.TimerUnit},
+			{"mask", autoupdate.TimerUnit},
+		}, true
+	default:
+		return nil, false
+	}
 }
 
 // SwitchArgs returns the complete `bootc` argv for switching this host to

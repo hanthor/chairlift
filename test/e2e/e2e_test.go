@@ -212,6 +212,10 @@ func TestInstalledBundleAndHelperBoundary(t *testing.T) {
 		// operation.
 		{name: "ublue rollback with a target image", helper: "chairlift-ublue-helper", args: []string{"rollback", "ghcr.io/evil/image:old"}, wantStderr: "usage: chairlift-ublue-helper rollback"},
 		{name: "ublue rollback with a deployment index", helper: "chairlift-ublue-helper", args: []string{"rollback", "1"}, wantStderr: "usage: chairlift-ublue-helper rollback"},
+		// A caller-supplied unit would let an authenticated user enable or
+		// mask any systemd unit on the machine.
+		{name: "ublue auto updates with a unit", helper: "chairlift-ublue-helper", args: []string{"auto-updates-enable", "sshd.service"}, wantStderr: "usage: chairlift-ublue-helper auto-updates-enable"},
+		{name: "ublue auto updates with a flag", helper: "chairlift-ublue-helper", args: []string{"auto-updates-disable", "--now"}, wantStderr: "usage: chairlift-ublue-helper auto-updates-disable"},
 	}
 
 	for _, test := range tests {
