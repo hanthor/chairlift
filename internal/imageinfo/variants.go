@@ -78,12 +78,14 @@ type driverStreams struct {
 	streams []string
 }
 
-// imageDriverMap is the per-base-image variant table, keyed by the clean
-// registry path of the *base* image. Deriving the base from a variant image
-// is baseImage's job.
+// imageDriverMap is the built-in per-base-image variant table, keyed by the
+// clean registry path of the *base* image. Deriving the base from a variant
+// image is baseImage's job.
 //
 // Adding an image here is not enough on its own — a driver is only offered
-// when the running stream appears in its list.
+// when the running stream appears in its list. An administrator adds images
+// without rebuilding ChairLift through the `drivers:` section of
+// channels.yml; see LoadTable.
 var imageDriverMap = map[string][]driverStreams{
 	"ghcr.io/ublue-os/bluefin": {
 		{driver: DriverStandard, streams: []string{"latest", "stable", "stable-daily", "gts", "beta", "lts", "lts-hwe", "lts-testing", "lts-hwe-testing"}},
@@ -119,7 +121,7 @@ func SplitDriver(cleanRef string) (base string, driver Driver) {
 			// Only accept the split if the remainder is an image the table
 			// knows, so `bluefin-dx-nvidia` — a variant of an image
 			// ChairLift does not manage — is left alone.
-			if _, ok := imageDriverMap[trimmed]; ok {
+			if _, ok := activeDriverTable[trimmed]; ok {
 				return trimmed, candidate
 			}
 		}
@@ -132,7 +134,7 @@ func SplitDriver(cleanRef string) (base string, driver Driver) {
 // table, which is the signal to offer no variant switch at all.
 func AvailableDrivers(cleanRef, tag string) []Driver {
 	base, _ := SplitDriver(cleanRef)
-	entries, ok := imageDriverMap[base]
+	entries, ok := activeDriverTable[base]
 	if !ok || tag == "" {
 		return nil
 	}

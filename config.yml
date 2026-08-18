@@ -86,6 +86,19 @@ features_page:
     enabled: true
   gaming_group:
     enabled: true
+  # A language model served from a rootless container, on whichever
+  # accelerator this machine has. Shown everywhere Podman exists; the model
+  # is only downloaded once the switch is turned on.
+  #
+  # ai_images pins the container image per GPU vendor (nvidia, amd, intel,
+  # none) — for a site that mirrors registries — and ai_model changes what is
+  # served. Both are ordinary settings rather than root-only ones because the
+  # container runs unprivileged in the user's own account.
+  ai_group:
+    enabled: true
+    # ai_images:
+    #   nvidia: registry.example.internal/ramalama/cuda:latest
+    # ai_model: ollama://qwen2.5:7b
 
 help_page:
   help_resources_group:

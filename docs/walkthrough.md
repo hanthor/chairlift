@@ -50,6 +50,11 @@ rebase you to a `-dx` image. **Gaming Mode** installs Steam, Proton tooling,
 and a few extras as user Flatpaks, no admin password needed. **System
 Features** below is Snow Linux's updex manager, empty elsewhere.
 
+**Local AI** runs a language model in a rootless container on your own
+hardware. ChairLift picks the image from the GPU it finds — CUDA, ROCm,
+Intel, or CPU — so there is one switch rather than a catalog. The API is
+served on `localhost:8080`; the first start downloads several GB.
+
 ---
 
 ## Applications

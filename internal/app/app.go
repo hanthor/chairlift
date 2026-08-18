@@ -7,6 +7,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/frostyard/chairlift/internal/aistack"
 	"github.com/frostyard/chairlift/internal/bootc"
 	"github.com/frostyard/chairlift/internal/distrobox"
 	"github.com/frostyard/chairlift/internal/flatpak"
@@ -92,6 +93,7 @@ func New() *Application {
 			updex.SetDryRun(true)
 			ublue.SetDryRun(true)
 			distrobox.SetDryRun(true)
+			aistack.SetDryRun(true)
 			// Lets the screenshot walkthrough render the Bluefin-family
 			// rows on a host that is not a Bluefin system. This is a no-op
 			// in every ordinary build; see imageinfo_override.go.

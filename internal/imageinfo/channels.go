@@ -46,6 +46,17 @@ var SystemTablePaths = []string{
 // as well as add one. Any other key is added.
 type rawTable struct {
 	Images map[string]rawImageChannels `yaml:"images"`
+	// Drivers overrides the graphics-driver variant table in the same file,
+	// because it answers the same question — which image references exist —
+	// and the privileged helper resolves a driver switch through it exactly
+	// as it resolves a channel switch. A second file would be a second
+	// chance for the GUI and the helper to disagree.
+	//
+	//	drivers:
+	//	  ghcr.io/tuna-os/tromso:
+	//	    standard: [latest, stable]
+	//	    nvidia:   [latest]
+	Drivers map[string]map[string][]string `yaml:"drivers"`
 }
 
 type rawImageChannels struct {
@@ -59,6 +70,26 @@ type rawImageChannels struct {
 // as the built-in table and is replaced wholesale by LoadSystemTable when an
 // override file is present.
 var activeTable = builtinTable()
+
+// activeDriverTable is the graphics-driver variant table every lookup
+// resolves through, on the same terms as activeTable.
+var activeDriverTable = builtinDriverTable()
+
+// builtinDriverTable returns a fresh copy of the compiled-in driver table.
+func builtinDriverTable() map[string][]driverStreams {
+	result := make(map[string][]driverStreams, len(imageDriverMap))
+	for ref, entries := range imageDriverMap {
+		cloned := make([]driverStreams, 0, len(entries))
+		for _, entry := range entries {
+			cloned = append(cloned, driverStreams{
+				driver:  entry.driver,
+				streams: append([]string(nil), entry.streams...),
+			})
+		}
+		result[ref] = cloned
+	}
+	return result
+}
 
 // builtinTable returns a fresh copy of the compiled-in channel table, so a
 // caller (or an override merge) cannot mutate the package's own definition.
@@ -105,27 +136,94 @@ func KnownImages() []string {
 // than silently dropping the bad entry, because a half-applied table is
 // exactly the situation that produces a wrong `bootc switch` target.
 func ParseTable(reader io.Reader) (map[string]imageChannels, error) {
+	table, _, err := parseTables(reader)
+	return table, err
+}
+
+// parseTables decodes both tables the file can carry.
+func parseTables(reader io.Reader) (map[string]imageChannels, map[string][]driverStreams, error) {
 	data, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("reading channel table: %w", err)
+		return nil, nil, fmt.Errorf("reading channel table: %w", err)
 	}
 
 	var raw rawTable
 	decoder := yaml.NewDecoder(strings.NewReader(string(data)))
 	decoder.KnownFields(true) // a typo'd key is an error, not a silent no-op
 	if err := decoder.Decode(&raw); err != nil && !errors.Is(err, io.EOF) {
-		return nil, fmt.Errorf("parsing channel table: %w", err)
+		return nil, nil, fmt.Errorf("parsing channel table: %w", err)
 	}
 
 	table := builtinTable()
 	for ref, entry := range raw.Images {
 		channels, err := convertEntry(ref, entry)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		table[ref] = channels
 	}
-	return table, nil
+
+	drivers := builtinDriverTable()
+	for ref, entry := range raw.Drivers {
+		converted, err := convertDriverEntry(ref, entry)
+		if err != nil {
+			return nil, nil, err
+		}
+		drivers[ref] = converted
+	}
+
+	return table, drivers, nil
+}
+
+// convertDriverEntry validates one `drivers:` entry. The rules mirror the
+// built-in table's own invariants: the key is a base image path, every
+// flavour is one ChairLift can name, and the standard flavour must be
+// present — a host on the base image that could not switch back to it would
+// be stranded on a driver image.
+func convertDriverEntry(ref string, entry map[string][]string) ([]driverStreams, error) {
+	if strings.Contains(ref, ":") {
+		return nil, fmt.Errorf("driver table key %q must be a registry path without a tag", ref)
+	}
+	if !strings.Contains(ref, "/") {
+		return nil, fmt.Errorf("driver table key %q must be a full registry path (registry/org/image)", ref)
+	}
+	for _, driver := range knownDrivers {
+		if strings.HasSuffix(ref, driver.suffix()) {
+			return nil, fmt.Errorf("driver table key %q must be the base image, not the %s variant", ref, driver)
+		}
+	}
+
+	// Table order decides the order the UI offers flavours in, so it is
+	// fixed here rather than taken from YAML map iteration.
+	order := []Driver{DriverStandard, DriverNVIDIA, DriverNVIDIAOpen}
+	known := make(map[string]bool, len(order))
+	for _, driver := range order {
+		known[string(driver)] = true
+	}
+	for name := range entry {
+		if !known[name] {
+			return nil, fmt.Errorf("driver table entry %q: unknown driver %q", ref, name)
+		}
+	}
+	if len(entry[string(DriverStandard)]) == 0 {
+		return nil, fmt.Errorf("driver table entry %q needs a %s stream list, otherwise a host on a driver image could not switch back", ref, DriverStandard)
+	}
+
+	converted := make([]driverStreams, 0, len(entry))
+	for _, driver := range order {
+		streams, ok := entry[string(driver)]
+		if !ok {
+			continue
+		}
+		if len(streams) == 0 {
+			return nil, fmt.Errorf("driver table entry %q: driver %q has an empty stream list", ref, driver)
+		}
+		converted = append(converted, driverStreams{
+			driver:  driver,
+			streams: append([]string(nil), streams...),
+		})
+	}
+	return converted, nil
 }
 
 // convertEntry validates one override entry and converts it to the internal
@@ -199,7 +297,7 @@ func LoadTable(paths []string) (string, error) {
 			return "", fmt.Errorf("opening channel table %s: %w", path, err)
 		}
 
-		table, parseErr := ParseTable(file)
+		table, drivers, parseErr := parseTables(file)
 		closeErr := file.Close()
 		if parseErr != nil {
 			return "", fmt.Errorf("%s: %w", path, parseErr)
@@ -209,6 +307,7 @@ func LoadTable(paths []string) (string, error) {
 		}
 
 		activeTable = table
+		activeDriverTable = drivers
 		return path, nil
 	}
 	return "", nil
@@ -222,7 +321,8 @@ func LoadSystemTable() (string, error) {
 	return LoadTable(SystemTablePaths)
 }
 
-// ResetTable restores the built-in table. It exists for tests.
+// ResetTable restores the built-in tables. It exists for tests.
 func ResetTable() {
 	activeTable = builtinTable()
+	activeDriverTable = builtinDriverTable()
 }

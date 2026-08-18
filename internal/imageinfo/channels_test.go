@@ -285,3 +285,106 @@ func TestResetTableRestoresTheBuiltins(t *testing.T) {
 		t.Error("ResetTable() dropped the built-in images")
 	}
 }
+
+func TestDriverOverrideAddsAnImage(t *testing.T) {
+	t.Cleanup(ResetTable)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "channels.yml")
+	if err := os.WriteFile(path, []byte(`
+drivers:
+  ghcr.io/tuna-os/tromso:
+    standard: [latest, stable]
+    nvidia: [latest]
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := LoadTable([]string{path}); err != nil {
+		t.Fatalf("LoadTable: %v", err)
+	}
+
+	drivers := AvailableDrivers("ghcr.io/tuna-os/tromso", "latest")
+	if len(drivers) != 2 || drivers[0] != DriverStandard || drivers[1] != DriverNVIDIA {
+		t.Fatalf("AvailableDrivers = %v, want [standard nvidia]", drivers)
+	}
+
+	// stable lists only the standard flavour, so there is no choice to offer.
+	if got := AvailableDrivers("ghcr.io/tuna-os/tromso", "stable"); got != nil {
+		t.Errorf("AvailableDrivers on stable = %v, want nil", got)
+	}
+
+	target, ok := DriverTarget("ghcr.io/tuna-os/tromso", "latest", DriverNVIDIA)
+	if !ok || target != "ghcr.io/tuna-os/tromso-nvidia:latest" {
+		t.Errorf("DriverTarget = %q, %v", target, ok)
+	}
+
+	// The built-in entries survive an override that does not mention them.
+	if got := AvailableDrivers("ghcr.io/ublue-os/bluefin", "latest"); len(got) != 3 {
+		t.Errorf("built-in bluefin drivers = %v after override", got)
+	}
+}
+
+func TestDriverOverrideRejectsBadEntries(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want string
+	}{
+		{
+			name: "key carries a tag",
+			yaml: "drivers:\n  ghcr.io/tuna-os/tromso:latest:\n    standard: [latest]\n",
+			want: "without a tag",
+		},
+		{
+			name: "key is not a registry path",
+			yaml: "drivers:\n  tromso:\n    standard: [latest]\n",
+			want: "full registry path",
+		},
+		{
+			name: "key is a driver variant",
+			yaml: "drivers:\n  ghcr.io/tuna-os/tromso-nvidia:\n    standard: [latest]\n",
+			want: "not the nvidia variant",
+		},
+		{
+			name: "unknown driver",
+			yaml: "drivers:\n  ghcr.io/tuna-os/tromso:\n    standard: [latest]\n    intel: [latest]\n",
+			want: `unknown driver "intel"`,
+		},
+		{
+			name: "no standard flavour",
+			yaml: "drivers:\n  ghcr.io/tuna-os/tromso:\n    nvidia: [latest]\n",
+			want: "could not switch back",
+		},
+		{
+			name: "empty stream list",
+			yaml: "drivers:\n  ghcr.io/tuna-os/tromso:\n    standard: [latest]\n    nvidia: []\n",
+			want: "empty stream list",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Cleanup(ResetTable)
+
+			path := filepath.Join(t.TempDir(), "channels.yml")
+			if err := os.WriteFile(path, []byte(tt.yaml), 0o644); err != nil {
+				t.Fatal(err)
+			}
+
+			_, err := LoadTable([]string{path})
+			if err == nil {
+				t.Fatal("LoadTable accepted an invalid driver table")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %q, want it to mention %q", err, tt.want)
+			}
+
+			// A rejected file must leave the built-in table in place rather
+			// than half-applied.
+			if len(AvailableDrivers("ghcr.io/ublue-os/bluefin", "latest")) != 3 {
+				t.Error("a rejected override disturbed the built-in driver table")
+			}
+		})
+	}
+}

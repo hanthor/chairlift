@@ -196,6 +196,23 @@ detected GPU rather than bluefinctl's full quadlet catalog.
 - **Done when:** a table test covers stack selection for Nvidia, AMD, Intel,
   and no-GPU hosts, and the walkthrough captures the row on a stubbed GPU.
 
+✅ landed. Met. `internal/aistack` selects one RamaLama image per detected
+accelerator — all four cases plus the hybrid laptop are covered by
+`TestSelectCoversEveryHardwareCase` — and the Features screenshot shows the
+row resolving to the CUDA stack from the walkthrough's stubbed Intel+NVIDIA
+hybrid, asserted by the `views: ai stack group built` marker.
+
+The catalog reduction went further than planned: rather than one stack per
+vendor directory, there is one runtime for every host. bluefinctl has no
+Intel or CPU stack at all, so a per-vendor port would have left those hosts
+with an empty page.
+
+Site overrides were added in the same phase, on request: `ai_images` and
+`ai_model` in `config.yml` pin the image and model, and the graphics-driver
+variant table gained a `drivers:` section in the root-only `channels.yml`
+(the driver switch is resolved by the privileged helper, so it cannot take
+configuration from a user-writable path).
+
 ## Phase 8 — Changelog / SBOM diff (large)
 
 Approved 2026-08-17.

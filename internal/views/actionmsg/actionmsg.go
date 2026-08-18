@@ -538,3 +538,30 @@ func DriverSwitch(dryRun bool, driver string) FeatureToggleDecision {
 		Toast:   fmt.Sprintf("Switched to the %s image. Restart to apply.", driver),
 	}
 }
+
+// AIStack returns the toast for the local-AI switch. accelerator names the
+// compute stack the hardware selected, so the toast confirms which image was
+// installed rather than just that something was.
+func AIStack(dryRun bool, enable bool, accelerator string) FeatureToggleDecision {
+	if dryRun {
+		verb := "removed"
+		if enable {
+			verb = "installed"
+		}
+		return FeatureToggleDecision{
+			Confirm: false,
+			Toast:   fmt.Sprintf("[DRY-RUN] Preview: the %s AI stack would be %s — no changes made", accelerator, verb),
+		}
+	}
+
+	if enable {
+		return FeatureToggleDecision{
+			Confirm: true,
+			Toast:   fmt.Sprintf("Local AI server started on the %s stack — the first model download runs in the background", accelerator),
+		}
+	}
+	return FeatureToggleDecision{
+		Confirm: true,
+		Toast:   "Local AI server stopped and removed",
+	}
+}

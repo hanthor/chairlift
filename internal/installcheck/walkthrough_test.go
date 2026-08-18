@@ -175,6 +175,7 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 		"features_group": "updex",
 		"dx_group":       "Developer Mode",
 		"gaming_group":   "Gaming Mode",
+		"ai_group":       "Local AI",
 		// help_page
 		"help_resources_group": "issues",
 	}

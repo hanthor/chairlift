@@ -30,6 +30,15 @@ type GroupConfig struct {
 	Issues       string         `yaml:"issues,omitempty"`
 	Chat         string         `yaml:"chat,omitempty"`
 	BundlesPaths []string       `yaml:"bundles_paths,omitempty"`
+	// AIImages overrides the local-AI container image per GPU vendor
+	// ("nvidia", "amd", "intel", "none"). It lives in the ordinary config
+	// file rather than the root-only channels.yml because the AI stack
+	// crosses no privilege boundary: the container runs rootless in the
+	// invoking account, so a user pointing it at their own image can do
+	// nothing they could not do by running podman directly.
+	AIImages map[string]string `yaml:"ai_images,omitempty"`
+	// AIModel overrides the model the stack serves.
+	AIModel string `yaml:"ai_model,omitempty"`
 }
 
 // ActionConfig represents a configurable action
@@ -62,13 +71,15 @@ type rawPageConfig map[string]rawGroupConfig
 // string/slice, means the file set that field explicitly and it replaces the
 // default outright.
 type rawGroupConfig struct {
-	Enabled      *bool           `yaml:"enabled"`
-	AppID        *string         `yaml:"app_id"`
-	Actions      *[]ActionConfig `yaml:"actions"`
-	Website      *string         `yaml:"website"`
-	Issues       *string         `yaml:"issues"`
-	Chat         *string         `yaml:"chat"`
-	BundlesPaths *[]string       `yaml:"bundles_paths"`
+	Enabled      *bool              `yaml:"enabled"`
+	AppID        *string            `yaml:"app_id"`
+	Actions      *[]ActionConfig    `yaml:"actions"`
+	Website      *string            `yaml:"website"`
+	Issues       *string            `yaml:"issues"`
+	Chat         *string            `yaml:"chat"`
+	BundlesPaths *[]string          `yaml:"bundles_paths"`
+	AIImages     *map[string]string `yaml:"ai_images"`
+	AIModel      *string            `yaml:"ai_model"`
 }
 
 // configPaths are the locations to search for the config file
@@ -219,6 +230,12 @@ func mergeGroup(def GroupConfig, raw rawGroupConfig) GroupConfig {
 	if raw.Chat != nil {
 		result.Chat = *raw.Chat
 	}
+	if raw.AIImages != nil {
+		result.AIImages = *raw.AIImages
+	}
+	if raw.AIModel != nil {
+		result.AIModel = *raw.AIModel
+	}
 	if raw.BundlesPaths != nil {
 		result.BundlesPaths = *raw.BundlesPaths
 	}
@@ -294,6 +311,7 @@ func defaultConfig() *Config {
 			// which is every non-Bluefin host including Snow Linux.
 			"dx_group":     GroupConfig{Enabled: true},
 			"gaming_group": GroupConfig{Enabled: true},
+			"ai_group":     GroupConfig{Enabled: true},
 		},
 		HelpPage: PageConfig{
 			"help_resources_group": GroupConfig{

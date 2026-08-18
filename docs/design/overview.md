@@ -1183,6 +1183,26 @@ away before it finished; every other toggle completes in view and already has
 a toast, so a second notification there would be noise the simple-interface
 constraint rules out.
 
+### Local AI
+
+`internal/aistack` is ChairLift's answer to bluefinctl's `stacks/` directory.
+bluefinctl ships twelve quadlet definitions under `nvidia/` and `amd/` and
+makes the user choose one; ChairLift ships one runtime whose image is chosen
+by the hardware. RamaLama publishes a per-accelerator image
+(`quay.io/ramalama/{cuda,rocm,intel-gpu,ramalama}`), so `Select(gpu.Set)` is
+the entire selection logic and every host — including Intel and GPU-less
+ones, which bluefinctl's catalog cannot serve at all — gets a working answer.
+
+The package splits the same way the rest of the codebase does: `Select` and
+`RenderUnit` are pure and table-tested across all four hardware cases plus
+the hybrid laptop, while the filesystem and `systemctl --user` calls sit
+behind the `unitDir`/`runSystemctl` seams. Nothing is privileged — the
+quadlet goes in the user's own `~/.config/containers/systemd` — so there is
+no helper subcommand and no PolicyKit action, the same shape as gaming mode.
+`IsEnabled` reads the unit file's presence rather than the service's runtime
+state, because the first start pulls several gigabytes and a status-derived
+switch would flicker for the whole pull.
+
 ### Powerwash and Factory Reset
 
 `internal/powerwash` is Powerwash's pure sequencer, in the same shape as

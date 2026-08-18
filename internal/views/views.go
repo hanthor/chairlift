@@ -111,6 +111,12 @@ type UserHome struct {
 	driverButton    *gtk.Button
 	driverGate      actionstate.Gate
 
+	// Local AI (features_page ai_group)
+	aiStackGroup  *adw.PreferencesGroup
+	aiStackRow    *adw.ActionRow
+	aiStackSwitch *gtk.Switch
+	aiStackGate   actionstate.Gate
+
 	// Powerwash / Factory Reset (maintenance_page reset_group)
 	powerwashGate    actionstate.Gate
 	factoryResetGate actionstate.Gate

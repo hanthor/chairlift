@@ -109,7 +109,11 @@ An agent must not break these:
   through a `channels.yml` override, which is read only from
   `/etc/chairlift/channels.yml` and `/usr/share/chairlift/channels.yml` —
   never the working directory, because the privileged helper resolves its
-  switch target through the same table.
+  switch target through the same table. The graphics-driver variant table
+  lives in the same file's `drivers:` section for the same reason: a driver
+  switch is resolved by the same helper, so it must not be configurable from
+  a user-writable path, and keeping both tables in one file removes any way
+  for the GUI and the helper to load different ones.
 - **Update All composes; it does not add a privileged route.** `internal/updateall`
   is the pure sequencer for the OS/Flatpak/Homebrew update run: it executes
   nothing itself, taking every provider as a function seam whose production
@@ -248,6 +252,18 @@ An agent must not break these:
   Update All's completion, because it is the one action long enough a user may
   have stepped away. A toggle or switch completes in view and already has a
   toast; do not add a second notification for the same instant event.
+- **The local-AI stack is one switch, and it is unprivileged.** ChairLift
+  ships one runtime (RamaLama) whose per-accelerator image is chosen by
+  `internal/gpu`, not bluefinctl's twelve-quadlet vendor catalog — that
+  catalog has no answer for an Intel or a GPU-less host. `internal/aistack`
+  writes one quadlet to the user's `~/.config/containers/systemd` and drives
+  it with `systemctl --user`, so the container is rootless in the invoking
+  account and nothing is layered onto a bootc image. That is why its image
+  and model overrides (`ai_images`, `ai_model`) live in the ordinary
+  `config.yml` rather than the root-only `channels.yml`: pointing a rootless
+  container at another image grants nothing running podman directly would
+  not. Do not give it a pkexec route, and do not reintroduce a vendor/stack
+  matrix in the UI.
 - **Powerwash and Factory Reset are opt-in and always confirmed.**
   `reset_group` (maintenance_page) ships `enabled: false` in config.yml, the
   same default as `maintenance_cleanup_group`, because both actions are

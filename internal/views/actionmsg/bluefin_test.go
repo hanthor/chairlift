@@ -219,3 +219,36 @@ func TestPowerwashConfirmsOnlyWhenSomethingWasRemoved(t *testing.T) {
 		})
 	}
 }
+
+func TestAIStackNamesTheAccelerator(t *testing.T) {
+	decision := AIStack(false, true, "CUDA")
+
+	if !decision.Confirm {
+		t.Error("a live enable did not confirm the switch")
+	}
+	if !strings.Contains(decision.Toast, "CUDA") {
+		t.Errorf("toast does not name the accelerator: %q", decision.Toast)
+	}
+}
+
+func TestAIStackDryRunDoesNotConfirm(t *testing.T) {
+	decision := AIStack(true, true, "ROCm")
+
+	if decision.Confirm {
+		t.Error("a dry-run enable confirmed the switch")
+	}
+	if !strings.Contains(decision.Toast, "DRY-RUN") {
+		t.Errorf("toast is not marked as a preview: %q", decision.Toast)
+	}
+}
+
+func TestAIStackDisableConfirms(t *testing.T) {
+	decision := AIStack(false, false, "CPU")
+
+	if !decision.Confirm {
+		t.Error("a live disable did not confirm the switch")
+	}
+	if !strings.Contains(decision.Toast, "stopped") {
+		t.Errorf("toast does not say the server stopped: %q", decision.Toast)
+	}
+}

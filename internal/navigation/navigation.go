@@ -108,6 +108,7 @@ var items = []Item{
 			"features_group",
 			"dx_group",
 			"gaming_group",
+			"ai_group",
 		},
 	},
 	{

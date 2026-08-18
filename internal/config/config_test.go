@@ -472,3 +472,33 @@ func TestUpdatesPageDefaultGroupsHaveBuilders(t *testing.T) {
 		}
 	}
 }
+
+// TestAIOverridesMergeLikeEveryOtherGroupField covers the two settings the
+// local-AI group adds: a per-vendor image map and the served model.
+func TestAIOverridesMergeLikeEveryOtherGroupField(t *testing.T) {
+	path := writeConfigFile(t, "features_page:\n"+
+		"  ai_group:\n"+
+		"    ai_images:\n"+
+		"      nvidia: registry.example.internal/ramalama/cuda:pinned\n"+
+		"    ai_model: ollama://qwen2.5:7b\n")
+
+	cfg, err := loadFromPath(path)
+	if err != nil {
+		t.Fatalf("loadFromPath: %v", err)
+	}
+
+	group := cfg.GetGroupConfig("features_page", "ai_group")
+	if group == nil {
+		t.Fatal("ai_group is missing from the merged config")
+	}
+	if got := group.AIImages["nvidia"]; got != "registry.example.internal/ramalama/cuda:pinned" {
+		t.Errorf("AIImages[nvidia] = %q", got)
+	}
+	if group.AIModel != "ollama://qwen2.5:7b" {
+		t.Errorf("AIModel = %q", group.AIModel)
+	}
+	// Overriding one vendor must not disturb the group's own default state.
+	if !group.Enabled {
+		t.Error("ai_group was disabled by an unrelated override")
+	}
+}
