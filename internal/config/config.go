@@ -309,9 +309,10 @@ func defaultConfig() *Config {
 			// Capabilities you turn on. Both hide themselves when
 			// internal/ublue reports no /usr/share/ublue-os/image-info.json,
 			// which is every non-Bluefin host including Snow Linux.
-			"dx_group":     GroupConfig{Enabled: true},
-			"gaming_group": GroupConfig{Enabled: true},
-			"ai_group":     GroupConfig{Enabled: true},
+			"dx_group":              GroupConfig{Enabled: true},
+			"gaming_group":          GroupConfig{Enabled: true},
+			"ai_group":              GroupConfig{Enabled: true},
+			"troubleshooting_group": GroupConfig{Enabled: true},
 		},
 		HelpPage: PageConfig{
 			"help_resources_group": GroupConfig{

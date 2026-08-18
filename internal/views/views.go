@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/frostyard/chairlift/internal/config"
+	"github.com/frostyard/chairlift/internal/troubleshoot"
 	"github.com/frostyard/chairlift/internal/views/actionstate"
 	"github.com/frostyard/chairlift/internal/views/badgestate"
 	"github.com/frostyard/chairlift/internal/views/rowset"
@@ -119,6 +120,13 @@ type UserHome struct {
 	changelogBooted   string
 	changelogStaged   string
 	changelogGate     actionstate.Gate
+
+	// Enhanced Troubleshooting (features_page troubleshooting_group)
+	troubleshootGroup  *adw.PreferencesGroup
+	troubleshootRow    *adw.ActionRow
+	troubleshootButton *gtk.Button
+	troubleshootState  troubleshoot.State
+	troubleshootGate   actionstate.Gate
 
 	// Local AI (features_page ai_group)
 	aiStackGroup  *adw.PreferencesGroup

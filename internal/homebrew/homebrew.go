@@ -113,6 +113,10 @@ var stateChangingCommands = map[string]bool{
 	"bundle":    true,
 	"cleanup":   true,
 	"trust":     true,
+	// tap clones a repository and changes which packages brew will
+	// install from. Leaving it out would both run it for real under
+	// --dry-run and bound a fresh clone by the 30-second read timeout.
+	"tap": true,
 }
 
 // commandTimeout returns the timeout class for a brew invocation: the
@@ -387,6 +391,14 @@ func parseSearchOutput(output string, kind PackageKind) []SearchResult {
 		}
 	}
 	return results
+}
+
+// Tap adds a third-party tap. It is required before installing a package by
+// its qualified user/tap/name: brew refuses the shorthand for a tap that is
+// not already present, rather than silently trusting it.
+func Tap(name string) error {
+	_, err := runBrewCommand("tap", name)
+	return err
 }
 
 // Install installs a package

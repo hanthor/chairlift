@@ -252,6 +252,22 @@ An agent must not break these:
   Update All's completion, because it is the one action long enough a user may
   have stepped away. A toggle or switch completes in view and already has a
   toast; do not add a second notification for the same instant event.
+- **Enhanced Troubleshooting reads state, it does not infer it.**
+  `internal/troubleshoot` ports Bluefin's `ujust probe` into one row, from
+  `ublue-os/tap`: `linux-mcp-server` (which pulls `block-goose-cli`) plus the
+  `goose-linux` cask. `goose-mcp-setup` exits 0 without writing anything when
+  a Goose configuration already exists, so readiness must come from finding
+  the `linux-tools` extension in `~/.config/goose/config.yaml` — never from
+  the script's exit code, and never from the packages being installed. It is
+  an action row, not a switch: turning it off would mean either leaving Goose
+  calling a removed binary or rewriting a file another tool owns. ChairLift
+  reads `GOOSE_PROVIDER` and never writes it; the row must keep naming the
+  provider, because the default the setup script writes sends system details
+  to Google and "AI assistant" alone implies otherwise. Everything is a
+  user-scope Homebrew install and the MCP tools are read-only, so nothing
+  here touches pkexec. `brew tap` is in `stateChangingCommands`, without
+  which it would run for real under `--dry-run`, including during
+  `make screenshots`.
 - **The staged-update changelog never fetches on its own.** `internal/sbom`
   is pure — parse, diff, version ordering — with the registry round-trip
   behind the `FetchFunc` seam, so no gated test makes an outbound request

@@ -1183,6 +1183,32 @@ away before it finished; every other toggle completes in view and already has
 a toast, so a second notification there would be noise the simple-interface
 constraint rules out.
 
+### Enhanced Troubleshooting
+
+`internal/troubleshoot` is ChairLift's port of Bluefin's `ujust probe`
+recipe (`projectbluefin/dakota`, `files/just-overrides/default.just`): tap
+`ublue-os/tap`, install `linux-mcp-server`, wire its `linux-tools` extension
+into Goose, launch a session. The formula depends on `block-goose-cli`, so
+one install brings the agent too; the `goose-linux` cask from the same tap
+provides the desktop app, which is what ChairLift launches rather than
+guessing at a terminal emulator.
+
+The load-bearing detail is state detection. `goose-mcp-setup` prints a
+snippet and exits 0 when `~/.config/goose/config.yaml` already exists, so a
+user who has run `goose configure` gets a successful setup that wired up
+nothing. `Detect` therefore reads the file for the `linux-tools` extension,
+and `Setup` returns the state it actually left rather than the one it aimed
+for — `TroubleshootSetupSubtitle` has a case for exactly that outcome.
+
+`ParseConfig` scans lines instead of decoding YAML on purpose: ChairLift
+neither owns nor rewrites that file, needs only two facts from it, and a line
+scan cannot corrupt a document another tool wrote. The provider is read and
+displayed, never written — the default the setup script installs is
+`gemini-cli`, which sends system details to Google, and the row says so.
+
+Nothing crosses a privilege boundary: every piece is a user-scope Homebrew
+install and linux-mcp-server's access is read-only.
+
 ### Staged-update changelog
 
 `internal/sbom` answers "what actually changes if I take this update?" from

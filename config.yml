@@ -99,6 +99,12 @@ features_page:
     # ai_images:
     #   nvidia: registry.example.internal/ramalama/cuda:latest
     # ai_model: ollama://qwen2.5:7b
+  # An AI assistant that can read this system's logs, services, and network
+  # to help diagnose problems. Everything it installs comes from Homebrew, so
+  # the group hides itself where Homebrew is absent. Nothing is downloaded
+  # until the user presses Set Up.
+  troubleshooting_group:
+    enabled: true
 
 help_page:
   help_resources_group:

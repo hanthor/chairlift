@@ -180,6 +180,7 @@ func TestPageMetadataCoversEveryBuilderBackedGroup(t *testing.T) {
 			"dx_group",
 			"gaming_group",
 			"ai_group",
+			"troubleshooting_group",
 		},
 		"help": {"help_resources_group"},
 	}

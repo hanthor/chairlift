@@ -46,8 +46,11 @@ wants it. Neither appears unless there's actually something to switch to.
 and serial devices. **Gaming Mode** installs Steam and the tools that make
 games run well. **Local AI** runs an AI model on your own machine instead of
 in the cloud, using your graphics card if you have one — the first start
-downloads several GB. **System Features** is Snow Linux's feature manager,
-and is empty elsewhere.
+downloads several GB. **Enhanced Troubleshooting** sets up an AI assistant
+that can read your logs, services, and network to help work out what's wrong,
+then launches it — the row says which AI service answers your questions,
+since the default one is Google's. **System Features** is Snow Linux's
+feature manager, and is empty elsewhere.
 
 ---
 

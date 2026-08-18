@@ -15,6 +15,7 @@ import (
 	"github.com/frostyard/chairlift/internal/imageinfo"
 	"github.com/frostyard/chairlift/internal/navigation"
 	"github.com/frostyard/chairlift/internal/sysupdate"
+	"github.com/frostyard/chairlift/internal/troubleshoot"
 	"github.com/frostyard/chairlift/internal/ublue"
 	"github.com/frostyard/chairlift/internal/updex"
 	"github.com/frostyard/chairlift/internal/views"
@@ -94,6 +95,7 @@ func New() *Application {
 			ublue.SetDryRun(true)
 			distrobox.SetDryRun(true)
 			aistack.SetDryRun(true)
+			troubleshoot.SetDryRun(true)
 			// Lets the screenshot walkthrough render the Bluefin-family
 			// rows on a host that is not a Bluefin system. This is a no-op
 			// in every ordinary build; see imageinfo_override.go.

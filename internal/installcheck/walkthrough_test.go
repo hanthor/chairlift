@@ -172,10 +172,11 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 		"maintenance_optimization_group": "Clean up files",
 		"reset_group":                    "Powerwash",
 		// features_page
-		"features_group": "feature manager",
-		"dx_group":       "Developer Mode",
-		"gaming_group":   "Gaming Mode",
-		"ai_group":       "Local AI",
+		"features_group":        "feature manager",
+		"dx_group":              "Developer Mode",
+		"gaming_group":          "Gaming Mode",
+		"ai_group":              "Local AI",
+		"troubleshooting_group": "Enhanced Troubleshooting",
 		// help_page
 		"help_resources_group": "issues",
 	}

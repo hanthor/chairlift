@@ -31,6 +31,10 @@ func (uh *UserHome) buildFeaturesPage() {
 		uh.buildAIStackGroup(page)
 	}
 
+	if uh.config.IsGroupEnabled("features_page", "troubleshooting_group") {
+		uh.buildTroubleshootGroup(page)
+	}
+
 	if uh.config.IsGroupEnabled("features_page", "features_group") {
 		// Build the features group (shown if updex is available)
 		uh.featuresGroup = adw.NewPreferencesGroup()
