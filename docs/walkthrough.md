@@ -21,7 +21,14 @@ date in one click, with per-phase status and a desktop notification when it
 finishes — the one operation long enough you might step away. A restart
 prompt shows up only when an image was actually staged. **Automatic Updates**
 is one switch for background updates. **Roll Back** (in System Updates, on
-bootc hosts) is one row naming the previous deployment.
+bootc hosts) is one row naming the previous deployment, and **What's
+Changing** next to it compares the running and staged images package by
+package — pulled from the images' own SBOMs, on request, since each side is
+a large download.
+
+> The System Updates group is absent from the screenshot above: it only
+> appears on a bootc host, and the machine that captures these images is not
+> one.
 
 Below that, the per-provider Flatpak and Homebrew groups still work
 independently if you just want to update one thing.

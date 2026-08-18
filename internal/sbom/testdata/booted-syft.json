@@ -1,0 +1,47 @@
+{
+  "schema": {
+    "version": "16.0.41"
+  },
+  "source": {
+    "name": "ghcr.io/ublue-os/bluefin",
+    "type": "image"
+  },
+  "artifacts": [
+    {
+      "id": "a1",
+      "name": "kernel",
+      "version": "6.17.4-200.fc44",
+      "type": "rpm"
+    },
+    {
+      "id": "a2",
+      "name": "mesa",
+      "version": "25.2.3-1.fc44",
+      "type": "rpm"
+    },
+    {
+      "id": "a3",
+      "name": "podman",
+      "version": "5.6.0-1.fc44",
+      "type": "rpm"
+    },
+    {
+      "id": "a4",
+      "name": "bootc",
+      "version": "1.7.0-1.fc44",
+      "type": "rpm"
+    },
+    {
+      "id": "a5",
+      "name": "removed-tool",
+      "version": "0.4.1-1.fc44",
+      "type": "rpm"
+    },
+    {
+      "id": "a6",
+      "name": "vendored-lib",
+      "version": "3f8a2b1c9d4e5f6071829304a5b6c7d8e9f0a1b2",
+      "type": "go-module"
+    }
+  ]
+}

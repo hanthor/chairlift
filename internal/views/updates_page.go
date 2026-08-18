@@ -60,6 +60,8 @@ func (uh *UserHome) buildUpdatesPage() {
 		uh.bootcStageBtn.ConnectClicked(&stageClickedCb)
 		uh.bootcStageExpander.AddSuffix(&uh.bootcStageBtn.Widget)
 
+		uh.buildChangelogRow(uh.bootcStageExpander)
+
 		group.Add(&uh.bootcStageExpander.Widget)
 
 		// Roll Back returns to the deployment bootc already records as the
@@ -587,6 +589,7 @@ func (uh *UserHome) loadBootcUpdateStatus(group *adw.PreferencesGroup) {
 			version = status.Status.Staged.Version()
 		}
 		uh.bootcStageExpander.SetSubtitle(pageview.BootcUpdateSubtitle(staged, version))
+		uh.refreshChangelogAvailability(status)
 	})
 }
 

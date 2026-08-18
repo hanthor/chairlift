@@ -1,0 +1,16 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "name": "example",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-1",
+      "name": "kernel",
+      "versionInfo": "6.17.4-200.fc44"
+    },
+    {
+      "SPDXID": "SPDXRef-2",
+      "name": "mesa",
+      "versionInfo": "25.2.3-1.fc44"
+    }
+  ]
+}

@@ -252,6 +252,19 @@ An agent must not break these:
   Update All's completion, because it is the one action long enough a user may
   have stepped away. A toggle or switch completes in view and already has a
   toast; do not add a second notification for the same instant event.
+- **The staged-update changelog never fetches on its own.** `internal/sbom`
+  is pure — parse, diff, version ordering — with the registry round-trip
+  behind the `FetchFunc` seam, so no gated test makes an outbound request
+  (`fetch_test.go` drives a loopback `httptest` registry instead). Discovery
+  must keep both paths: GHCR answers `/v2/<repo>/referrers/<digest>` with
+  404 for these images, and the SBOM is only reachable through the
+  specification's fallback tag (`sha256-<hex>`) — verified 2026-08-17. What
+  that referrer serves is Syft JSON despite the `application/vnd.spdx+json`
+  artifact type, so `Parse` accepts both shapes and errors rather than
+  returning an empty map when it recognizes neither; a silent zero-package
+  parse renders a blank changelog with nothing in the chain reporting a
+  failure, which is a bug finupdate shipped. The diff runs only when the user
+  presses Compare, because each side is tens of megabytes.
 - **The local-AI stack is one switch, and it is unprivileged.** ChairLift
   ships one runtime (RamaLama) whose per-accelerator image is chosen by
   `internal/gpu`, not bluefinctl's twelve-quadlet vendor catalog — that

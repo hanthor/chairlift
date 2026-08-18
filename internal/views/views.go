@@ -111,6 +111,15 @@ type UserHome struct {
 	driverButton    *gtk.Button
 	driverGate      actionstate.Gate
 
+	// Staged-update changelog (SBOM diff), a drill-down inside
+	// bootcStageExpander rather than a page of its own.
+	changelogRow      *adw.ActionRow
+	changelogButton   *gtk.Button
+	changelogSections []*adw.ExpanderRow
+	changelogBooted   string
+	changelogStaged   string
+	changelogGate     actionstate.Gate
+
 	// Local AI (features_page ai_group)
 	aiStackGroup  *adw.PreferencesGroup
 	aiStackRow    *adw.ActionRow

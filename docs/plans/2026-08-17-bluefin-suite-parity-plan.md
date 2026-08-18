@@ -224,6 +224,28 @@ Approved 2026-08-17.
 - **Done when:** the diff is table-tested against checked-in SPDX fixtures,
   and the walkthrough captures the drill-down.
 
+✅ landed. Partially met, and the shortfall is the screenshot.
+
+Met: `internal/sbom` parses both SBOM shapes, diffs them into
+upgraded/downgraded/added/removed plus an explicit "order unknown" bucket,
+and is table-tested against checked-in fixtures in both Syft and SPDX form.
+The registry fetch sits behind the `FetchFunc` seam and is separately covered
+against a loopback `httptest` registry, which is what pins the two behaviors
+found while building it: GHCR 404s the referrers API for these images (the
+fallback tag is load-bearing, not a nicety), and what it serves under the
+SPDX artifact type is Syft JSON.
+
+Not met: the walkthrough does not capture the drill-down. It lives inside
+`bootc_updates_group`, which is hidden unless the host is booted from a bootc
+deployment *and* ships the stage script — the capture runner is neither, so
+the whole System Updates group is absent from `3-updates.png`. Capturing it
+would need a fourth `chairlift_e2e` stub standing in for `bootc status`, and
+that stub would sit on the OS-staging path rather than on a read-only
+display-side classification, which is the line the stub-surface invariant
+draws. The row's text and every diff category are covered by
+`pageview.ChangelogSections`/`ChangelogSummary` table tests instead, and
+`docs/walkthrough.md` says plainly why the group is missing from the frame.
+
 ## Later / ideas
 
 - Reboot-on-logout and scheduled reboot windows, if the systemd user unit

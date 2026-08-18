@@ -1183,6 +1183,38 @@ away before it finished; every other toggle completes in view and already has
 a toast, so a second notification there would be noise the simple-interface
 constraint rules out.
 
+### Staged-update changelog
+
+`internal/sbom` answers "what actually changes if I take this update?" from
+the images themselves rather than a hand-written changelog. The package is
+split the usual way: `Parse`, `Diff`, and `CompareVersions` are pure and
+fixture-tested, `RegistryClient.Fetch` does the registry round-trip, and
+`Compare` takes the fetch as a `FetchFunc` seam so the gated tests never
+reach the network.
+
+Two registry behaviors shape the implementation, both verified against
+ghcr.io/ublue-os/bluefin:stable on 2026-08-17. First, GHCR returns 404 from
+the OCI referrers API for these images; the SBOM is discoverable only through
+the specification's fallback tag, the manifest digest rewritten as
+`sha256-<hex>`, which returns an index carrying the artifact types. A client
+that only calls the referrers API finds nothing on the registry that
+publishes Bluefin. Second, the referrer advertised as
+`application/vnd.spdx+json` is Syft JSON — a top-level `artifacts` array,
+4,562 entries — so `Parse` accepts both shapes and treats "recognized
+neither" as an error.
+
+Version ordering follows rpm, including the tilde rule that makes `1.0~rc1`
+precede `1.0`. Where the order genuinely cannot be established — two commit
+hashes, or versions in unrelated formats — the pair lands in
+`Result.Changed` rather than being guessed into `Upgraded`, because
+presenting an unknown direction as an upgrade is how a rollback comes to look
+like an update.
+
+The UI is a drill-down inside the staged-update expander, not a page: the
+diff only means anything relative to a specific staged update, and a page
+would have to invent an answer for a system with nothing staged. The fetch is
+never automatic.
+
 ### Local AI
 
 `internal/aistack` is ChairLift's answer to bluefinctl's `stacks/` directory.
