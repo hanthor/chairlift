@@ -77,6 +77,19 @@ mkdir -p "$HOME"
 # read in internal/ublue — the privileged helper always resolves the real
 # /usr/share/ublue-os/image-info.json. Dakota on its stable stream is used
 # because it is the case where every row is both visible and switchable.
+# Show the Powerwash / Factory Reset rows. reset_group ships disabled — both
+# actions are irreversible — but the walkthrough exists to document every
+# feature, including the ones an administrator has to opt into. Config, not a
+# build-tag stub, is the intended mechanism: internal/config resolves a
+# relative candidate alongside the executable first, so a file dropped next
+# to the e2e binary applies to this capture only and leaves the shipped
+# config.yml untouched.
+cat > "$(dirname "$APP")/config.yml" <<'YAML'
+maintenance_page:
+  reset_group:
+    enabled: true
+YAML
+
 if [ -z "${CHAIRLIFT_IMAGE_INFO:-}" ]; then
     CHAIRLIFT_IMAGE_INFO="$OUTDIR/image-info.json"
     cat > "$CHAIRLIFT_IMAGE_INFO" <<'JSON'

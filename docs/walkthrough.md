@@ -79,9 +79,10 @@ taps.
 ![Maintenance](screenshots/2-maintenance.png)
 
 Homebrew and Flatpak cleanup, plus any maintenance actions the image
-maintainer configured. An optional **Reset** group (off by default) adds
-Powerwash — remove every Flatpak and Distrobox container — and Factory
-Reset, each behind a confirmation dialog since neither can be undone.
+maintainer configured. The **Reset** group ships off; it is
+enabled above so you can see it. Powerwash removes every user Flatpak and
+Distrobox container, Factory Reset reinstalls the current image, and each
+asks for confirmation first since neither can be undone.
 
 ---
 

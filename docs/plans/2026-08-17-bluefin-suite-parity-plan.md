@@ -239,10 +239,13 @@ Not met: the walkthrough does not capture the drill-down. It lives inside
 `bootc_updates_group`, which is hidden unless the host is booted from a bootc
 deployment *and* ships the stage script — the capture runner is neither, so
 the whole System Updates group is absent from `3-updates.png`. Capturing it
-would need a fourth `chairlift_e2e` stub standing in for `bootc status`, and
-that stub would sit on the OS-staging path rather than on a read-only
-display-side classification, which is the line the stub-surface invariant
-draws. The row's text and every diff category are covered by
+would need a fourth `chairlift_e2e` stub standing in for `bootc status`. The
+stub-surface invariant would permit it — the stage helper is built without
+the tag and resolves its own state, so a GUI-side status stub stays
+display-only — but the surface is capped deliberately, and growing it on the
+staging package to gain one frame is not a trade worth making. (Contrast
+`reset_group`, which the capture enables through ordinary configuration
+rather than a stub, and which is therefore in the frame.) The row's text and every diff category are covered by
 `pageview.ChangelogSections`/`ChangelogSummary` table tests instead, and
 `docs/walkthrough.md` says plainly why the group is missing from the frame.
 
