@@ -147,8 +147,8 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 	// the omission rather than hiding it.
 	documented := map[string]string{
 		// system_page
-		"system_info_group":  "os-release",
-		"bootc_status_group": "deployment status",
+		"system_info_group":  "Your system details",
+		"bootc_status_group": "queued for the next",
 		"health_group":       "Mission Center",
 		"channel_group":      "Release Channel",
 		// updates_page
@@ -157,22 +157,22 @@ func TestWalkthroughCoversEveryConfigurableGroup(t *testing.T) {
 		"sysupdate_updates_group": "System Updates",
 		"flatpak_updates_group":   "Flatpak",
 		"brew_updates_group":      "Homebrew",
-		"brew_trust_group":        "tap trust",
+		"brew_trust_group":        "unofficial",
 		// applications_page
-		"applications_installed_group": "Installed Flatpaks",
+		"applications_installed_group": "Your installed apps",
 		"flatpak_user_group":           "Flatpak",
 		"flatpak_system_group":         "Flatpak",
-		"brew_group":                   "Homebrew formulae",
+		"brew_group":                   "Homebrew packages",
 		"brew_search_group":            "search across both",
 		"brew_bundles_group":           "Bundles",
 		// maintenance_page
-		"maintenance_cleanup_group":      "maintenance actions",
-		"maintenance_brew_group":         "Homebrew and Flatpak cleanup",
-		"maintenance_flatpak_group":      "Homebrew and Flatpak cleanup",
-		"maintenance_optimization_group": "Homebrew and Flatpak cleanup",
+		"maintenance_cleanup_group":      "your distribution added",
+		"maintenance_brew_group":         "Clean up files",
+		"maintenance_flatpak_group":      "Clean up files",
+		"maintenance_optimization_group": "Clean up files",
 		"reset_group":                    "Powerwash",
 		// features_page
-		"features_group": "updex",
+		"features_group": "feature manager",
 		"dx_group":       "Developer Mode",
 		"gaming_group":   "Gaming Mode",
 		"ai_group":       "Local AI",

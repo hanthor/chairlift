@@ -4,9 +4,8 @@ Every screen in ChairLift, captured from the real app by `make screenshots`
 (see [below](#how-these-are-made)) — not mockups.
 
 One app for Snow Linux and the Bluefin family (Bluefin, Bluefin LTS, Dakota).
-Features ported from [bluefinctl](https://github.com/projectbluefin/bluefinctl)
-and [finupdate](https://github.com/tuna-os/finupdate) come down to one control
-per decision — no strategy pickers, no schedule choosers, no feature grids.
+Everything here is one control per decision — no strategy pickers, no
+schedule choosers, no feature grids.
 
 ---
 
@@ -14,16 +13,16 @@ per decision — no strategy pickers, no schedule choosers, no feature grids.
 
 ![Updates](screenshots/3-updates.png)
 
-**Update All** updates the OS image, Flatpak apps, and Homebrew packages in
-one click, with per-phase status and a notification when it finishes. It asks
-for a restart only if an image was actually staged. **Automatic Updates** is
-one switch for background updates. The per-provider Flatpak and Homebrew
-groups below still work on their own.
+**Update All** updates your system, your apps, and your packages in one
+click, and tells you when it's done. It only asks you to restart if something
+actually needs one. **Automatic Updates** keeps everything up to date in the
+background. The Flatpak and Homebrew groups below let you update just one
+thing if you prefer.
 
-**System Updates** adds **Roll Back**, naming the previous deployment, and
-**What's Changing**, a package-by-package diff of the running and staged
-images. It appears on bootc hosts only, so it is missing from the screenshot
-above.
+**System Updates** adds **Roll Back**, which returns you to the previous
+version if an update went badly, and **What's Changing**, which lists exactly
+what software a pending update will add, remove, or upgrade. That group only
+appears on systems that update as a whole, so it's not in the shot above.
 
 ---
 
@@ -31,12 +30,11 @@ above.
 
 ![System](screenshots/4-system.png)
 
-Image and deployment status, `os-release` details, and a Mission Center link.
-Two switches change which image you run: **Release Channel** (stable/testing)
-and **Graphics Driver** (the matching NVIDIA image, when your card needs it
-and the image exists for your stream). Neither is offered when there is
-nothing to switch to — see
-[ADR-0011](adr/0011-chairlift-owns-bluefin-family-rebasing.md).
+Your system details, what's installed now, and what's queued for the next
+restart. **Release Channel** switches between the stable version and the
+early one. **Graphics Driver** switches you to the NVIDIA driver if your card
+wants it. Neither appears unless there's actually something to switch to.
+**Mission Center** opens the system monitor.
 
 ---
 
@@ -44,12 +42,12 @@ nothing to switch to — see
 
 ![Features](screenshots/5-features.png)
 
-**Developer Mode** joins the container/VM/serial-device groups — it does not
-rebase you to a `-dx` image. **Gaming Mode** installs Steam, Proton tooling,
-and a few extras as user Flatpaks, no admin password needed. **Local AI**
-serves a language model on `localhost:8080` from a rootless container, using
-whichever GPU you have — the first start downloads several GB. **System
-Features** is Snow Linux's updex manager, empty elsewhere.
+**Developer Mode** gives your account access to containers, virtual machines,
+and serial devices. **Gaming Mode** installs Steam and the tools that make
+games run well. **Local AI** runs an AI model on your own machine instead of
+in the cloud, using your graphics card if you have one — the first start
+downloads several GB. **System Features** is Snow Linux's feature manager,
+and is empty elsewhere.
 
 ---
 
@@ -57,9 +55,9 @@ Features** is Snow Linux's updex manager, empty elsewhere.
 
 ![Applications](screenshots/1-applications.png)
 
-Installed Flatpaks and Homebrew formulae/casks, search across both, **Bundles**
-for one-click package sets, and per-user tap trust for untrusted Homebrew
-taps.
+Your installed apps and Homebrew packages, search across both, **Bundles**
+for installing a whole set at once, and a prompt before using an unofficial
+Homebrew tap.
 
 ---
 
@@ -67,11 +65,11 @@ taps.
 
 ![Maintenance](screenshots/2-maintenance.png)
 
-Homebrew and Flatpak cleanup, plus any maintenance actions the image
-maintainer configured. **Reset** holds the two irreversible ones, each behind
-a confirmation dialog: Powerwash removes every user Flatpak and Distrobox
-container, Factory Reset reinstalls the current image. It ships off, and is
-switched on above so you can see it.
+Clean up files you no longer need, plus anything else your distribution added
+here. **Reset** holds the two you can't undo, so each asks first: Powerwash
+removes everything you installed, and Factory Reset puts the system back to
+how it shipped. It's switched off normally, and turned on above so you can
+see it.
 
 ---
 
@@ -89,13 +87,11 @@ Links to the distribution's website, issues, and discussions.
 make screenshots
 ```
 
-Builds the app, runs it headless under Xvfb, navigates every page, and writes
-one cropped PNG per page to `docs/screenshots/`. Always `--dry-run`, so
-nothing on the capture machine changes. What the capture host can't have — a
-Bluefin image, an NVIDIA GPU, an active update timer — comes from stubs
-compiled only into the `chairlift_e2e` build, which `make ci` checks no
-released binary can read.
+Builds the app, runs it headless under Xvfb, and writes one cropped PNG per
+page to `docs/screenshots/`. Always `--dry-run`, so nothing on the capture
+machine changes. Hardware the runner doesn't have is stubbed, and `make ci`
+checks no released binary can read those stubs.
 
-Run it when a feature's appearance changes; it is not regenerated per commit,
+Run it when something's appearance changes; it isn't regenerated per commit,
 since font and theme drift would churn the repo. `make ci` checks that every
 page and configurable group has a screenshot and an entry here.
